@@ -64,46 +64,20 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const { type, payload } = req.body || {};
 
-      if (type === 'SEED_INITIAL_DATA') {
-        const {
-          courses = [],
-          centres = [],
-          resourcePersons = [],
-          students = [],
-          enrollments = [],
-          classLogs = [],
-          remittances = [],
-          payouts = []
-        } = payload;
-
-        // Upsert courses
-        for (const c of courses) {
-          await Course.findOneAndUpdate({ id: c.id }, c, { upsert: true, new: true });
-        }
-        for (const c of centres) {
-          await Centre.findOneAndUpdate({ id: c.id }, c, { upsert: true, new: true });
-        }
-        for (const r of resourcePersons) {
-          await ResourcePerson.findOneAndUpdate({ id: r.id }, r, { upsert: true, new: true });
-        }
-        for (const s of students) {
-          await StudentAccount.findOneAndUpdate({ account_phone: s.account_phone }, s, { upsert: true, new: true });
-        }
-        for (const e of enrollments) {
-          await Enrollment.findOneAndUpdate({ id: e.id }, e, { upsert: true, new: true });
-        }
-        for (const l of classLogs) {
-          await ClassLog.findOneAndUpdate({ id: l.id }, l, { upsert: true, new: true });
-        }
-        for (const rem of remittances) {
-          await Remittance.findOneAndUpdate({ id: rem.id }, rem, { upsert: true, new: true });
-        }
-        for (const p of payouts) {
-          await Payout.findOneAndUpdate({ id: p.id }, p, { upsert: true, new: true });
-        }
-
-        return res.status(200).json({ success: true, message: 'CPET Initial data seeded to MongoDB.' });
+      if (type === 'CLEAR_ALL_DATA') {
+        await Promise.all([
+          Course.deleteMany({}),
+          Centre.deleteMany({}),
+          ResourcePerson.deleteMany({}),
+          StudentAccount.deleteMany({}),
+          Enrollment.deleteMany({}),
+          ClassLog.deleteMany({}),
+          Remittance.deleteMany({}),
+          Payout.deleteMany({})
+        ]);
+        return res.status(200).json({ success: true, message: 'All database records cleared.' });
       }
+
 
       if (type === 'SYNC_ENTITY') {
         const { entityName, item } = payload;

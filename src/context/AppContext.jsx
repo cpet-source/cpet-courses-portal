@@ -13,16 +13,16 @@ import {
 const AppContext = createContext();
 
 const STORAGE_KEYS = {
-  COURSES: 'cpet_courses_v1',
-  CENTRES: 'cpet_centres_v1',
-  RPS: 'cpet_rps_v1',
-  STUDENTS: 'cpet_students_v1',
-  ENROLLMENTS: 'cpet_enrollments_v1',
-  CLASS_LOGS: 'cpet_class_logs_v1',
-  REMITTANCES: 'cpet_remittances_v1',
-  PAYOUTS: 'cpet_payouts_v1',
-  ACTIVE_ROLE: 'cpet_active_role_v1',
-  CURRENT_RP_ID: 'cpet_current_rp_id_v1'
+  COURSES: 'cpet_courses_prod',
+  CENTRES: 'cpet_centres_prod',
+  RPS: 'cpet_rps_prod',
+  STUDENTS: 'cpet_students_prod',
+  ENROLLMENTS: 'cpet_enrollments_prod',
+  CLASS_LOGS: 'cpet_class_logs_prod',
+  REMITTANCES: 'cpet_remittances_prod',
+  PAYOUTS: 'cpet_payouts_prod',
+  ACTIVE_ROLE: 'cpet_active_role_prod',
+  CURRENT_RP_ID: 'cpet_current_rp_id_prod'
 };
 
 const getStored = (key, fallback) => {
@@ -35,21 +35,21 @@ const getStored = (key, fallback) => {
 };
 
 export const AppProvider = ({ children }) => {
-  const [courses, setCourses] = useState(() => getStored(STORAGE_KEYS.COURSES, initialCourses));
-  const [centres, setCentres] = useState(() => getStored(STORAGE_KEYS.CENTRES, initialCentres));
-  const [resourcePersons, setResourcePersons] = useState(() => getStored(STORAGE_KEYS.RPS, initialResourcePersons));
-  const [students, setStudents] = useState(() => getStored(STORAGE_KEYS.STUDENTS, initialStudents));
-  const [enrollments, setEnrollments] = useState(() => getStored(STORAGE_KEYS.ENROLLMENTS, initialEnrollments));
-  const [classLogs, setClassLogs] = useState(() => getStored(STORAGE_KEYS.CLASS_LOGS, initialClassLogs));
-  const [remittances, setRemittances] = useState(() => getStored(STORAGE_KEYS.REMITTANCES, initialRemittances));
-  const [payouts, setPayouts] = useState(() => getStored(STORAGE_KEYS.PAYOUTS, initialPayouts));
+  const [courses, setCourses] = useState(() => getStored(STORAGE_KEYS.COURSES, []));
+  const [centres, setCentres] = useState(() => getStored(STORAGE_KEYS.CENTRES, []));
+  const [resourcePersons, setResourcePersons] = useState(() => getStored(STORAGE_KEYS.RPS, []));
+  const [students, setStudents] = useState(() => getStored(STORAGE_KEYS.STUDENTS, []));
+  const [enrollments, setEnrollments] = useState(() => getStored(STORAGE_KEYS.ENROLLMENTS, []));
+  const [classLogs, setClassLogs] = useState(() => getStored(STORAGE_KEYS.CLASS_LOGS, []));
+  const [remittances, setRemittances] = useState(() => getStored(STORAGE_KEYS.REMITTANCES, []));
+  const [payouts, setPayouts] = useState(() => getStored(STORAGE_KEYS.PAYOUTS, []));
   
   // Authentication state
-  const [currentUser, setCurrentUser] = useState(() => getStored('cpet_current_user_v1', null));
+  const [currentUser, setCurrentUser] = useState(() => getStored('cpet_current_user_prod', null));
 
   // Active view role: 'admin' | 'rp' | 'student'. Defaults to 'student' if not authenticated!
   const [activeRole, setActiveRole] = useState(() => {
-    const user = getStored('cpet_current_user_v1', null);
+    const user = getStored('cpet_current_user_prod', null);
     if (user?.role === 'admin') return 'admin';
     if (user?.role === 'rp') return 'rp';
     return 'student';
@@ -57,8 +57,8 @@ export const AppProvider = ({ children }) => {
 
   // Currently logged-in RP
   const [currentRpId, setCurrentRpId] = useState(() => {
-    const user = getStored('cpet_current_user_v1', null);
-    return user?.role === 'rp' ? user.id : 'rp-1';
+    const user = getStored('cpet_current_user_prod', null);
+    return user?.role === 'rp' ? user.id : '';
   });
 
   const [isCloudConnected, setIsCloudConnected] = useState(false);
@@ -79,7 +79,7 @@ export const AppProvider = ({ children }) => {
       const user = { role: 'admin', email: 'cpet@dhiu.in', name: 'Super Admin' };
       setCurrentUser(user);
       setActiveRole('admin');
-      localStorage.setItem('cpet_current_user_v1', JSON.stringify(user));
+      localStorage.setItem('cpet_current_user_prod', JSON.stringify(user));
       return true;
     }
     return false;
@@ -87,13 +87,13 @@ export const AppProvider = ({ children }) => {
 
   const loginRp = (phone, password) => {
     const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-    const rp = resourcePersons.find(r => r.phone.replace(/\D/g, '').slice(-10) === cleanPhone && r.password === password);
+    const rp = resourcePersons.find(r => r.phone && r.phone.replace(/\D/g, '').slice(-10) === cleanPhone && r.password === password);
     if (rp) {
       const user = { role: 'rp', id: rp.id, phone: rp.phone, name: rp.full_name };
       setCurrentUser(user);
       setCurrentRpId(rp.id);
       setActiveRole('rp');
-      localStorage.setItem('cpet_current_user_v1', JSON.stringify(user));
+      localStorage.setItem('cpet_current_user_prod', JSON.stringify(user));
       return true;
     }
     return false;
@@ -102,10 +102,9 @@ export const AppProvider = ({ children }) => {
   const logout = () => {
     setCurrentUser(null);
     setActiveRole('student');
-    localStorage.removeItem('cpet_current_user_v1');
+    localStorage.removeItem('cpet_current_user_prod');
     showToast('Logged out of authorized portal.');
   };
-
 
   // Helper to sync to MongoDB if cloud is active
   const syncToCloud = (entityName, item) => {
@@ -129,41 +128,21 @@ export const AppProvider = ({ children }) => {
         if (res && res.connected && res.data) {
           setIsCloudConnected(true);
           const d = res.data;
-          if (d.courses && d.courses.length > 0) setCourses(d.courses);
-          if (d.centres && d.centres.length > 0) setCentres(d.centres);
-          if (d.resourcePersons && d.resourcePersons.length > 0) setResourcePersons(d.resourcePersons);
-          if (d.students && d.students.length > 0) setStudents(d.students);
-          if (d.enrollments && d.enrollments.length > 0) setEnrollments(d.enrollments);
-          if (d.classLogs && d.classLogs.length > 0) setClassLogs(d.classLogs);
-          if (d.remittances && d.remittances.length > 0) setRemittances(d.remittances);
-          if (d.payouts && d.payouts.length > 0) setPayouts(d.payouts);
-
-          // Seed if empty
-          if (!d.courses || d.courses.length === 0) {
-            fetch('/api/data', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'SEED_INITIAL_DATA',
-                payload: {
-                  courses: initialCourses,
-                  centres: initialCentres,
-                  resourcePersons: initialResourcePersons,
-                  students: initialStudents,
-                  enrollments: initialEnrollments,
-                  classLogs: initialClassLogs,
-                  remittances: initialRemittances,
-                  payouts: initialPayouts
-                }
-              })
-            }).catch(() => {});
-          }
+          setCourses(d.courses || []);
+          setCentres(d.centres || []);
+          setResourcePersons(d.resourcePersons || []);
+          setStudents(d.students || []);
+          setEnrollments(d.enrollments || []);
+          setClassLogs(d.classLogs || []);
+          setRemittances(d.remittances || []);
+          setPayouts(d.payouts || []);
         }
       })
       .catch(() => {
         // Local mode
       });
   }, []);
+
 
 
   // Sync to local storage
@@ -210,18 +189,25 @@ export const AppProvider = ({ children }) => {
   // Current active RP object
   const currentRp = resourcePersons.find(rp => rp.id === currentRpId) || resourcePersons[0];
 
-  // Reset to seed data
-  const resetAllData = () => {
-    setCourses(initialCourses);
-    setCentres(initialCentres);
-    setResourcePersons(initialResourcePersons);
-    setStudents(initialStudents);
-    setEnrollments(initialEnrollments);
-    setClassLogs(initialClassLogs);
-    setRemittances(initialRemittances);
-    setPayouts(initialPayouts);
+  // Reset / Clear all data
+  const resetAllData = async () => {
+    setCourses([]);
+    setCentres([]);
+    setResourcePersons([]);
+    setStudents([]);
+    setEnrollments([]);
+    setClassLogs([]);
+    setRemittances([]);
+    setPayouts([]);
     localStorage.clear();
-    showToast('All CPET Portal data reset to defaults.', 'info');
+    try {
+      await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'CLEAR_ALL_DATA' })
+      });
+    } catch (e) {}
+    showToast('Database wiped clean. Ready for real data.', 'info');
   };
 
   // 1. Course Management

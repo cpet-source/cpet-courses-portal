@@ -20,11 +20,12 @@ import {
   Users,
   MapPin,
   TrendingUp,
-  ArrowRight
+  ArrowRight,
+  RotateCcw
 } from 'lucide-react';
 
 export const AdminDashboard = () => {
-  const { courses, centres, enrollments, classLogs, remittances, resourcePersons } = useApp();
+  const { courses, centres, enrollments, classLogs, remittances, resourcePersons, resetAllData } = useApp();
   const [activeTab, setActiveTab] = useState('overview');
 
   // Pending counts
@@ -237,6 +238,27 @@ export const AdminDashboard = () => {
                 Open Student Directory
               </button>
             </div>
+          </div>
+
+          {/* Production Database Initialization Banner */}
+          <div style={{ marginTop: '1.5rem', background: '#f8fafc', border: '1px solid var(--cpet-border)', borderRadius: 'var(--radius-lg)', padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h4 style={{ color: 'var(--cpet-primary)', margin: 0, fontWeight: 700 }}>Production Data Initialization</h4>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '3px 0 0' }}>
+                Wipe all test records across MongoDB and start completely fresh for official CPET operations.
+              </p>
+            </div>
+            <button
+              className="btn btn-secondary btn-sm"
+              style={{ color: '#dc2626' }}
+              onClick={() => {
+                if (window.confirm('Are you sure you want to wipe all records from MongoDB and start completely fresh? This cannot be undone.')) {
+                  resetAllData();
+                }
+              }}
+            >
+              <RotateCcw size={14} /> Wipe All Test Records
+            </button>
           </div>
         </div>
       )}
