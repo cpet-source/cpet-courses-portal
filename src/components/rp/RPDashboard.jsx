@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { RPClassLogger } from './RPClassLogger';
 import { RPCentreStudents } from './RPCentreStudents';
+import { RPAcademicEvaluation } from './RPAcademicEvaluation';
 import { RPFeeRemittance } from './RPFeeRemittance';
 import { RPNewCentreForm } from './RPNewCentreForm';
 import {
@@ -13,7 +14,8 @@ import {
   CheckCircle,
   Clock,
   DollarSign,
-  MapPin
+  MapPin,
+  Award
 } from 'lucide-react';
 
 export const RPDashboard = () => {
@@ -95,6 +97,14 @@ export const RPDashboard = () => {
         </button>
 
         <button
+          className={`tab-btn ${activeTab === 'evaluation' ? 'active' : ''}`}
+          onClick={() => setActiveTab('evaluation')}
+        >
+          <Award size={16} />
+          <span>Marks & Attendance</span>
+        </button>
+
+        <button
           className={`tab-btn ${activeTab === 'remittance' ? 'active' : ''}`}
           onClick={() => setActiveTab('remittance')}
         >
@@ -114,8 +124,12 @@ export const RPDashboard = () => {
       {/* Tab Views */}
       {activeTab === 'classes' && <RPClassLogger />}
       {activeTab === 'students' && (
-        <RPCentreStudents onNavigateToNewCentre={() => setActiveTab('newcentre')} />
+        <RPCentreStudents
+          onNavigateToNewCentre={() => setActiveTab('newcentre')}
+          onNavigateToEvaluation={() => setActiveTab('evaluation')}
+        />
       )}
+      {activeTab === 'evaluation' && <RPAcademicEvaluation />}
       {activeTab === 'remittance' && <RPFeeRemittance />}
       {activeTab === 'newcentre' && <RPNewCentreForm onCentreCreated={() => setActiveTab('students')} />}
     </div>

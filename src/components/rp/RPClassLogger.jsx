@@ -167,7 +167,7 @@ export const RPClassLogger = () => {
                     <option value="">-- Select Course --</option>
                     {courses.map(c => (
                       <option key={c.id} value={c.id}>
-                        {c.title} ({c.course_code})
+                        {c.title} ({c.course_code}) [{c.category?.replace('_', ' ')}]
                       </option>
                     ))}
                   </select>
@@ -175,7 +175,7 @@ export const RPClassLogger = () => {
 
                 <div className="form-group">
                   <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
-                    2. Study Centre (Under this Course) <span className="required">*</span>
+                    2. Study Centre <span className="required">*</span>
                   </label>
                   <select
                     className="form-select"
@@ -185,17 +185,28 @@ export const RPClassLogger = () => {
                     style={{ fontWeight: 600 }}
                   >
                     <option value="">-- Select Study Centre --</option>
-                    {displayedCentres.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.centre_name} ({c.place}, {c.district})
-                      </option>
-                    ))}
+                    {availableCentresForCourse.length > 0 && (
+                      <optgroup label="Centres Offering this Course">
+                        {availableCentresForCourse.map(c => (
+                          <option key={c.id} value={c.id}>
+                            ★ {c.centre_name} ({c.place}, {c.district})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <optgroup label={availableCentresForCourse.length > 0 ? "All Other Registered Study Centres" : "All Registered Study Centres"}>
+                      {centres
+                        .filter(c => !availableCentresForCourse.some(m => m.id === c.id))
+                        .map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.centre_name} ({c.place}, {c.district})
+                          </option>
+                        ))}
+                    </optgroup>
                   </select>
-                  {formData.course_id && availableCentresForCourse.length === 0 && (
-                    <span className="form-helper" style={{ color: '#d97706' }}>
-                      Notice: Showing all centres as this course is not yet tagged to a specific centre.
-                    </span>
-                  )}
+                  <span className="form-helper">
+                    All study centres in the CPET network are available for any visiting Resource Person to log classes.
+                  </span>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>

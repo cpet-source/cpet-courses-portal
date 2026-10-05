@@ -35,9 +35,21 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
     relationship: 'Self'
   });
 
-  // Centre Selection (if Mahallu Course)
-  const availableCentres = centres.filter(c => c.active_course_id === course.id || c.status === 'ACTIVE');
-  const [selectedCentreId, setSelectedCentreId] = useState(availableCentres[0]?.id || centres[0]?.id || '');
+  // Centre Selection (ONLY for Mahallu Courses)
+  const isMahallu = course.category === 'MAHALLU';
+  const availableCentres = centres.filter(c => {
+    if (!isMahallu) return false;
+    const isDirect = c.active_course_id === course.id;
+    const inList = Array.isArray(c.course_ids) && c.course_ids.includes(course.id);
+    return isDirect || inList;
+  });
+  const [selectedCentreId, setSelectedCentreId] = useState(availableCentres[0]?.id || '');
+
+  useEffect(() => {
+    if (isMahallu && availableCentres.length > 0 && !availableCentres.some(c => c.id === selectedCentreId)) {
+      setSelectedCentreId(availableCentres[0].id);
+    }
+  }, [course, availableCentres, selectedCentreId, isMahallu]);
 
   // Dynamic Custom Intake Responses
   const [customAnswers, setCustomAnswers] = useState({});
@@ -90,8 +102,14 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
       }
     }
 
+    if (isMahallu && !selectedCentreId) {
+      showToast('Please select your study centre for this Mahallu course', 'danger');
+      return;
+    }
+
     let initialFeeStatus = 'PENDING';
     if (course.payment_policy === 'FREE_COURSE') initialFeeStatus = 'FREE';
+    else if (course.payment_policy === 'COLLECTED_BY_RP') initialFeeStatus = 'PENDING';
     else if (course.payment_policy === 'PAY_AT_REGISTRATION' && paymentUtr) initialFeeStatus = 'PENDING';
     else if (course.payment_policy === 'PAY_ON_SPOT') initialFeeStatus = 'PENDING';
     else if (course.payment_policy === 'PAY_AFTER_CONFIRMATION') initialFeeStatus = 'PENDING';
@@ -305,23 +323,32 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
             </div>
           )}
 
-          {/* Mahallu Centre Selector (if Mahallu Course) */}
-          {course.category === 'MAHALLU' && (
+          {/* Mahallu Centre Selector (ONLY if Mahallu Course) */}
+          {isMahallu && (
             <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-              <label className="form-label">Select Your Mahallu Study Centre <span className="required">*</span></label>
-              <select
-                className="form-select"
-                required
-                value={selectedCentreId}
-                onChange={e => setSelectedCentreId(e.target.value)}
-                style={{ fontWeight: 700 }}
-              >
-                {centres.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.centre_name} ({c.place}, {c.district})
-                  </option>
-                ))}
-              </select>
+              <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                Select Your Mahallu Study Centre <span className="required">*</span>
+              </label>
+              {availableCentres.length === 0 ? (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', padding: '0.85rem', color: '#991b1b', fontSize: '0.85rem' }}>
+                  No study centres are currently open for enrollment under this Mahallu course. Please contact your local Mahallu committee or CPET office.
+                </div>
+              ) : (
+                <select
+                  className="form-select"
+                  required
+                  value={selectedCentreId}
+                  onChange={e => setSelectedCentreId(e.target.value)}
+                  style={{ fontWeight: 700 }}
+                >
+                  <option value="">-- Choose Study Centre --</option>
+                  {availableCentres.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.centre_name} ({c.place}, {c.district})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
 
@@ -452,6 +479,14 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
                 </div>
               )}
 
+              {course.payment_policy === 'COLLECTED_BY_RP' && (
+                <div style={{ background: '#ecfdf5', padding: '0.85rem', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                  <p style={{ fontSize: '0.85rem', color: '#065f46', margin: 0, fontWeight: 600 }}>
+                    🤝 <strong>Fee Collected by Resource Person:</strong> You do not need to pay online now. The course fee of ₹{course.standard_fee} will be collected in person by your assigned Resource Person / Mahallu Study Centre coordinator.
+                  </p>
+                </div>
+              )}
+
               {course.payment_policy === 'PAY_AFTER_CONFIRMATION' && (
                 <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
                   ℹ️ <strong>Pay on Confirmation:</strong> Your application will be reviewed by the CPET admissions team. We will contact you via WhatsApp / Phone to confirm your seat before collecting fees.
@@ -466,7 +501,12 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
             </div>
           )}
 
-          <button type="submit" className="btn btn-primary btn-block" style={{ fontSize: '1rem', padding: '0.85rem' }}>
+          <button
+            type="submit"
+            className="btn btn-primary btn-block"
+            disabled={isMahallu && availableCentres.length === 0}
+            style={{ fontSize: '1rem', padding: '0.85rem' }}
+          >
             <CheckCircle size={18} /> Confirm Registration & Generate Admission No.
           </button>
         </form>

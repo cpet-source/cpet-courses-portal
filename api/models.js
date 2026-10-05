@@ -72,6 +72,7 @@ const EnrollmentSchema = new mongoose.Schema({
   amount_paid: { type: Number, default: 0 },
   completion_status: { type: String, default: 'IN_PROGRESS' },
   classes_attended: { type: Number, default: 0 },
+  attended_sessions: [Number],
   marks: mongoose.Schema.Types.Mixed,
   custom_responses: mongoose.Schema.Types.Mixed
 }, { timestamps: true });

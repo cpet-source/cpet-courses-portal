@@ -16,7 +16,7 @@ import {
   GraduationCap
 } from 'lucide-react';
 
-export const RPCentreStudents = ({ onNavigateToNewCentre }) => {
+export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation }) => {
   const {
     currentRp,
     centres,
@@ -238,6 +238,12 @@ export const RPCentreStudents = ({ onNavigateToNewCentre }) => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {onNavigateToEvaluation && (
+            <button className="btn btn-secondary" onClick={onNavigateToEvaluation}>
+              <Award size={15} />
+              Marks & Attendance Register
+            </button>
+          )}
           <button className="btn btn-outline" onClick={() => setShowAttachCentreModal(true)}>
             <Plus size={15} />
             Launch Course at Centre

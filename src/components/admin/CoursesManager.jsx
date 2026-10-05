@@ -15,7 +15,7 @@ export const CoursesManager = () => {
     category: 'MAHALLU',
     description: '',
     evaluation_type: 'EXAM_ONLY',
-    payment_policy: 'PAY_AT_REGISTRATION',
+    payment_policy: 'COLLECTED_BY_RP',
     min_attendance_percentage: 75,
     total_planned_classes: 24,
     standard_fee: 1500,
@@ -34,7 +34,7 @@ export const CoursesManager = () => {
       category: 'MAHALLU',
       description: '',
       evaluation_type: 'EXAM_ONLY',
-      payment_policy: 'PAY_AT_REGISTRATION',
+      payment_policy: 'COLLECTED_BY_RP',
       min_attendance_percentage: 75,
       total_planned_classes: 24,
       standard_fee: 1500,
@@ -450,6 +450,7 @@ export const CoursesManager = () => {
                       value={formData.payment_policy}
                       onChange={e => setFormData({ ...formData, payment_policy: e.target.value })}
                     >
+                      <option value="COLLECTED_BY_RP">Collected by RP (Mahallu Model)</option>
                       <option value="PAY_AT_REGISTRATION">Pay at Registration (UPI/UTR Required)</option>
                       <option value="PAY_AFTER_CONFIRMATION">Register First, Pay on Confirmation</option>
                       <option value="PAY_ON_SPOT">Pay on Spot at Venue Entrance</option>

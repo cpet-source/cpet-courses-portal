@@ -756,6 +756,52 @@ export const AppProvider = ({ children }) => {
     showToast('Attendance recorded.');
   };
 
+  const toggleStudentSessionAttendance = (enrollmentId, sessionNumber) => {
+    setEnrollments(prev => prev.map(enr => {
+      if (enr.id === enrollmentId) {
+        const currentSessions = Array.isArray(enr.attended_sessions) ? [...enr.attended_sessions] : [];
+        const isAlreadyAttended = currentSessions.includes(sessionNumber);
+        const newSessions = isAlreadyAttended
+          ? currentSessions.filter(s => s !== sessionNumber)
+          : [...currentSessions, sessionNumber].sort((a, b) => a - b);
+
+        const updated = {
+          ...enr,
+          attended_sessions: newSessions,
+          classes_attended: newSessions.length
+        };
+        syncToCloud('Enrollment', updated);
+        return updated;
+      }
+      return enr;
+    }));
+  };
+
+  const batchMarkSessionAttendance = (enrollmentIds, sessionNumber, markPresent = true) => {
+    setEnrollments(prev => prev.map(enr => {
+      if (enrollmentIds.includes(enr.id)) {
+        const currentSessions = Array.isArray(enr.attended_sessions) ? [...enr.attended_sessions] : [];
+        const alreadyHas = currentSessions.includes(sessionNumber);
+        let newSessions = currentSessions;
+        if (markPresent && !alreadyHas) {
+          newSessions = [...currentSessions, sessionNumber].sort((a, b) => a - b);
+        } else if (!markPresent && alreadyHas) {
+          newSessions = currentSessions.filter(s => s !== sessionNumber);
+        }
+
+        const updated = {
+          ...enr,
+          attended_sessions: newSessions,
+          classes_attended: newSessions.length
+        };
+        syncToCloud('Enrollment', updated);
+        return updated;
+      }
+      return enr;
+    }));
+    showToast(markPresent ? `Class ${sessionNumber} attendance logged for batch!` : `Class ${sessionNumber} attendance reset.`);
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -800,7 +846,9 @@ export const AppProvider = ({ children }) => {
         disbursePayout,
         updateStudentMarks,
         updateStudentFee,
-        markStudentAttendance
+        markStudentAttendance,
+        toggleStudentSessionAttendance,
+        batchMarkSessionAttendance
       }}
     >
       {children}
