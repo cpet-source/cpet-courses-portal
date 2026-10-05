@@ -175,30 +175,89 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Check MongoDB connection on mount
-  useEffect(() => {
-    fetch('/api/data')
-      .then(r => r.json())
-      .then(res => {
-        if (res) {
-          if (res.connected && res.data) {
-            setIsCloudConnected(true);
-            setCloudError(null);
-            const d = res.data;
-            if (d.courses && d.courses.length > 0) {
-              setCourses(d.courses);
-            } else if (courses.length > 0) {
-              // Auto-sync existing local courses so they aren't lost
-              fetch('/api/data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  type: 'SYNC_ALL',
-                  payload: { courses, centres, resourcePersons, students, enrollments, classLogs, remittances, payouts }
-                })
-              }).catch(() => {});
-            }
+  // Live sync from MongoDB Atlas
+  const fetchLatestFromCloud = async () => {
+    try {
+      const r = await fetch('/api/data');
+      const res = await r.json();
+      if (res && res.connected && res.data) {
+        setIsCloudConnected(true);
+        setCloudError(null);
+        const d = res.data;
 
+        // Auto-merge or update from cloud
+        if (d.courses && d.courses.length > 0) setCourses(d.courses);
+        if (d.centres && d.centres.length > 0) setCentres(d.centres);
+        if (d.resourcePersons && d.resourcePersons.length > 0) setResourcePersons(d.resourcePersons);
+        if (d.students && d.students.length > 0) setStudents(d.students);
+        if (d.enrollments && d.enrollments.length > 0) setEnrollments(d.enrollments);
+        if (d.classLogs && d.classLogs.length > 0) setClassLogs(d.classLogs);
+        if (d.remittances && d.remittances.length > 0) setRemittances(d.remittances);
+        if (d.payouts && d.payouts.length > 0) setPayouts(d.payouts);
+        return true;
+      } else {
+        if (res?.error) setCloudError(res.error);
+        return false;
+      }
+    } catch (e) {
+      return false;
+    }
+  };
+
+  // Check MongoDB connection on mount, auto-sync unsaved local records, and poll
+  useEffect(() => {
+    const handleInitialSync = async () => {
+      try {
+        const r = await fetch('/api/data');
+        const res = await r.json();
+        if (res && res.connected && res.data) {
+          setIsCloudConnected(true);
+          setCloudError(null);
+          const d = res.data;
+
+          const localCourses = getStored(STORAGE_KEYS.COURSES, []);
+          const localCentres = getStored(STORAGE_KEYS.CENTRES, []);
+          const localStudents = getStored(STORAGE_KEYS.STUDENTS, []);
+          const localEnrollments = getStored(STORAGE_KEYS.ENROLLMENTS, []);
+
+          // If this browser has student/enrollment records not yet in cloud, auto-sync them up!
+          const hasLocalUnsynced =
+            (localStudents.length > (d.students?.length || 0)) ||
+            (localEnrollments.length > (d.enrollments?.length || 0)) ||
+            (localCentres.length > (d.centres?.length || 0)) ||
+            (localCourses.length > (d.courses?.length || 0));
+
+          if (hasLocalUnsynced) {
+            // Push any local items missing from cloud
+            await fetch('/api/data', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'SYNC_ALL',
+                payload: {
+                  courses: d.courses?.length > 0 ? d.courses : localCourses,
+                  centres: d.centres?.length > 0 ? d.centres : localCentres,
+                  resourcePersons: d.resourcePersons || [],
+                  students: localStudents.length > 0 ? localStudents : d.students,
+                  enrollments: localEnrollments.length > 0 ? localEnrollments : d.enrollments,
+                  classLogs: d.classLogs || [],
+                  remittances: d.remittances || [],
+                  payouts: d.payouts || []
+                }
+              })
+            });
+
+            // Re-fetch unified data
+            const r2 = await fetch('/api/data');
+            const res2 = await r2.json();
+            if (res2?.data) {
+              if (res2.data.courses) setCourses(res2.data.courses);
+              if (res2.data.centres) setCentres(res2.data.centres);
+              if (res2.data.students) setStudents(res2.data.students);
+              if (res2.data.enrollments) setEnrollments(res2.data.enrollments);
+            }
+          } else {
+            if (d.courses && d.courses.length > 0) setCourses(d.courses);
             if (d.centres && d.centres.length > 0) setCentres(d.centres);
             if (d.resourcePersons && d.resourcePersons.length > 0) setResourcePersons(d.resourcePersons);
             if (d.students && d.students.length > 0) setStudents(d.students);
@@ -206,18 +265,30 @@ export const AppProvider = ({ children }) => {
             if (d.classLogs && d.classLogs.length > 0) setClassLogs(d.classLogs);
             if (d.remittances && d.remittances.length > 0) setRemittances(d.remittances);
             if (d.payouts && d.payouts.length > 0) setPayouts(d.payouts);
-          } else {
-            setIsCloudConnected(false);
-            if (res.error) {
-              setCloudError(res.error);
-            }
           }
+        } else {
+          setIsCloudConnected(false);
+          if (res?.error) setCloudError(res.error);
         }
-      })
-      .catch(err => {
+      } catch (err) {
         setIsCloudConnected(false);
         setCloudError(err.message);
-      });
+      }
+    };
+
+    handleInitialSync();
+
+    // Auto-refresh when user clicks into this browser tab
+    const onFocus = () => fetchLatestFromCloud();
+    window.addEventListener('focus', onFocus);
+
+    // Auto-refresh every 12 seconds to pick up student registrations from other devices
+    const interval = setInterval(fetchLatestFromCloud, 12000);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      clearInterval(interval);
+    };
   }, []);
 
 
@@ -347,18 +418,27 @@ export const AppProvider = ({ children }) => {
 
 
   const updateCentreStatus = (centreId, newStatus) => {
-    setCentres(prev => prev.map(c => c.id === centreId ? { ...c, status: newStatus } : c));
+    setCentres(prev => prev.map(c => {
+      if (c.id === centreId) {
+        const updated = { ...c, status: newStatus };
+        syncToCloud('Centre', updated);
+        return updated;
+      }
+      return c;
+    }));
     showToast(`Centre status updated to ${newStatus}.`);
   };
 
   const assignRpToCentre = (centreId, rpId, activeCourseId) => {
     setCentres(prev => prev.map(c => {
       if (c.id === centreId) {
-        return {
+        const updated = {
           ...c,
           assigned_rp_id: rpId,
           active_course_id: activeCourseId || c.active_course_id
         };
+        syncToCloud('Centre', updated);
+        return updated;
       }
       return c;
     }));
@@ -373,6 +453,7 @@ export const AppProvider = ({ children }) => {
       status: 'ACTIVE'
     };
     setResourcePersons(prev => [...prev, newRp]);
+    syncToCloud('ResourcePerson', newRp);
     showToast(`Resource Person "${newRp.full_name}" onboarded!`);
     return newRp;
   };
@@ -400,6 +481,7 @@ export const AppProvider = ({ children }) => {
 
     let activeProfileId = existingMemberId;
     let activeProfileName = '';
+    let accountToSave = null;
 
     // Handle Student Account / Profiles
     setStudents(prev => {
@@ -408,46 +490,48 @@ export const AppProvider = ({ children }) => {
         if (existingMemberId) {
           const profile = existingAccount.members.find(m => m.id === existingMemberId);
           if (profile) activeProfileName = profile.full_name;
+          accountToSave = existingAccount;
           return prev;
         } else {
           // Add new family member under this phone
           const newProfile = {
             id: `prof-${Date.now()}`,
-            full_name: newMemberData.full_name,
-            gender: newMemberData.gender || 'MALE',
-            date_of_birth: newMemberData.date_of_birth || '',
-            relationship: newMemberData.relationship || 'Member',
-            place: newMemberData.place || (targetCentre ? targetCentre.place : ''),
-            district: newMemberData.district || (targetCentre ? targetCentre.district : '')
+            full_name: newMemberData?.full_name || 'Family Member',
+            gender: newMemberData?.gender || 'MALE',
+            date_of_birth: newMemberData?.date_of_birth || '',
+            relationship: newMemberData?.relationship || 'Member',
+            place: newMemberData?.place || (targetCentre ? targetCentre.place : ''),
+            district: newMemberData?.district || (targetCentre ? targetCentre.district : '')
           };
           activeProfileId = newProfile.id;
           activeProfileName = newProfile.full_name;
 
-          return prev.map(a => a.account_phone === cleanPhone ? {
-            ...a,
-            members: [...a.members, newProfile]
-          } : a);
+          accountToSave = {
+            ...existingAccount,
+            members: [...existingAccount.members, newProfile]
+          };
+          return prev.map(a => a.account_phone === cleanPhone ? accountToSave : a);
         }
       } else {
         // Create brand new account with initial member
         const newProfile = {
           id: `prof-${Date.now()}`,
-          full_name: newMemberData.full_name,
-          gender: newMemberData.gender || 'MALE',
-          date_of_birth: newMemberData.date_of_birth || '',
-          relationship: newMemberData.relationship || 'Self',
-          place: newMemberData.place || (targetCentre ? targetCentre.place : ''),
-          district: newMemberData.district || (targetCentre ? targetCentre.district : '')
+          full_name: newMemberData?.full_name || 'Primary Student',
+          gender: newMemberData?.gender || 'MALE',
+          date_of_birth: newMemberData?.date_of_birth || '',
+          relationship: newMemberData?.relationship || 'Self',
+          place: newMemberData?.place || (targetCentre ? targetCentre.place : ''),
+          district: newMemberData?.district || (targetCentre ? targetCentre.district : '')
         };
         activeProfileId = newProfile.id;
         activeProfileName = newProfile.full_name;
 
-        const newAccount = {
+        accountToSave = {
           account_phone: cleanPhone,
           whatsapp_number: whatsappNumber || cleanPhone,
           members: [newProfile]
         };
-        return [...prev, newAccount];
+        return [...prev, accountToSave];
       }
     });
 
@@ -478,6 +562,13 @@ export const AppProvider = ({ children }) => {
     };
 
     setEnrollments(prev => [newEnrollment, ...prev]);
+
+    // Push both StudentAccount and Enrollment to MongoDB Atlas Cloud!
+    if (accountToSave) {
+      syncToCloud('StudentAccount', accountToSave);
+    }
+    syncToCloud('Enrollment', newEnrollment);
+
     showToast(`Admission confirmed! Admission No: ${admissionNumber}`);
     return newEnrollment;
   };
@@ -509,6 +600,7 @@ export const AppProvider = ({ children }) => {
     };
 
     setClassLogs(prev => [newLog, ...prev]);
+    syncToCloud('ClassLog', newLog);
     showToast('Class log submitted successfully to CPET Office!');
     return newLog;
   };
@@ -516,12 +608,14 @@ export const AppProvider = ({ children }) => {
   const verifyClassLog = (logId, approvedAmount, adminNotes) => {
     setClassLogs(prev => prev.map(log => {
       if (log.id === logId) {
-        return {
+        const updated = {
           ...log,
           total_claim: approvedAmount !== undefined ? approvedAmount : log.total_claim,
           status: 'VERIFIED_BY_ADMIN',
           admin_notes: adminNotes || 'Approved by CPET Super Admin'
         };
+        syncToCloud('ClassLog', updated);
+        return updated;
       }
       return log;
     }));
@@ -547,12 +641,20 @@ export const AppProvider = ({ children }) => {
     };
 
     setRemittances(prev => [newRem, ...prev]);
+    syncToCloud('Remittance', newRem);
     showToast('Fee remittance submitted to CPET Office for confirmation!');
     return newRem;
   };
 
   const confirmRemittance = (remittanceId) => {
-    setRemittances(prev => prev.map(r => r.id === remittanceId ? { ...r, status: 'CONFIRMED_BY_OFFICE' } : r));
+    setRemittances(prev => prev.map(r => {
+      if (r.id === remittanceId) {
+        const updated = { ...r, status: 'CONFIRMED_BY_OFFICE' };
+        syncToCloud('Remittance', updated);
+        return updated;
+      }
+      return r;
+    }));
     showToast('Remittance confirmed! Ledger updated.');
   };
 
@@ -566,10 +668,14 @@ export const AppProvider = ({ children }) => {
     };
 
     setPayouts(prev => [newPayout, ...prev]);
+    syncToCloud('Payout', newPayout);
+
     // Also mark associated logs as paid
     setClassLogs(prev => prev.map(l => {
       if (l.rp_id === payoutData.rp_id && l.status === 'VERIFIED_BY_ADMIN') {
-        return { ...l, status: 'PAYMENT_PROCESSED' };
+        const updated = { ...l, status: 'PAYMENT_PROCESSED' };
+        syncToCloud('ClassLog', updated);
+        return updated;
       }
       return l;
     }));
@@ -581,13 +687,15 @@ export const AppProvider = ({ children }) => {
   const updateStudentMarks = (enrollmentId, subjectId, marks) => {
     setEnrollments(prev => prev.map(enr => {
       if (enr.id === enrollmentId) {
-        return {
+        const updated = {
           ...enr,
           marks: {
             ...enr.marks,
             [subjectId]: Number(marks)
           }
         };
+        syncToCloud('Enrollment', updated);
+        return updated;
       }
       return enr;
     }));
@@ -597,11 +705,13 @@ export const AppProvider = ({ children }) => {
   const updateStudentFee = (enrollmentId, feeStatus, amountPaid) => {
     setEnrollments(prev => prev.map(enr => {
       if (enr.id === enrollmentId) {
-        return {
+        const updated = {
           ...enr,
           fee_status: feeStatus,
           amount_paid: amountPaid !== undefined ? Number(amountPaid) : enr.amount_paid
         };
+        syncToCloud('Enrollment', updated);
+        return updated;
       }
       return enr;
     }));
@@ -611,10 +721,12 @@ export const AppProvider = ({ children }) => {
   const markStudentAttendance = (enrollmentId) => {
     setEnrollments(prev => prev.map(enr => {
       if (enr.id === enrollmentId) {
-        return {
+        const updated = {
           ...enr,
           classes_attended: (enr.classes_attended || 0) + 1
         };
+        syncToCloud('Enrollment', updated);
+        return updated;
       }
       return enr;
     }));
@@ -644,6 +756,7 @@ export const AppProvider = ({ children }) => {
         isCloudConnected,
         cloudError,
         syncAllLocalDataToCloud,
+        fetchLatestFromCloud,
         toast,
         showToast,
         resetAllData,

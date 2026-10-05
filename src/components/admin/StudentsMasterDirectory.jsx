@@ -1,13 +1,23 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Search, Download, MessageCircle, Eye, CheckCircle, Clock, AlertCircle, Filter, UserCheck, Calendar } from 'lucide-react';
+import { Search, Download, MessageCircle, Eye, CheckCircle, Clock, AlertCircle, Filter, UserCheck, Calendar, RefreshCw } from 'lucide-react';
 
 export const StudentsMasterDirectory = () => {
-  const { students, enrollments, courses, centres, updateStudentFee, showToast } = useApp();
+  const { students, enrollments, courses, centres, updateStudentFee, showToast, fetchLatestFromCloud } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCourseFilter, setSelectedCourseFilter] = useState('ALL');
   const [selectedFeeFilter, setSelectedFeeFilter] = useState('ALL');
   const [selectedStudentFor360, setSelectedStudentFor360] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchLatestFromCloud();
+    setTimeout(() => {
+      setIsRefreshing(false);
+      showToast('Live student records synced from cloud!');
+    }, 600);
+  };
 
   // Filter enrollments
   const filteredEnrollments = enrollments.filter(enr => {
@@ -90,10 +100,21 @@ export const StudentsMasterDirectory = () => {
             Single institutional database of every student across all Mahallu centres, diplomas, workshops, and camps.
           </p>
         </div>
-        <button className="btn btn-secondary" onClick={handleExportCSV}>
-          <Download size={16} />
-          Export to Excel (CSV)
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={handleRefresh}
+            title="Fetch latest student registrations from MongoDB cloud"
+            disabled={isRefreshing}
+          >
+            <RefreshCw size={15} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
+            <span>{isRefreshing ? 'Syncing...' : 'Refresh Live'}</span>
+          </button>
+          <button className="btn btn-secondary" onClick={handleExportCSV}>
+            <Download size={16} />
+            Export to Excel (CSV)
+          </button>
+        </div>
       </div>
 
       {/* Live Search & Filter Bar */}
