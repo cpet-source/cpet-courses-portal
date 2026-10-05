@@ -10,10 +10,18 @@ export const RPClassLogger = () => {
   const assignedCentres = centres.filter(c => c.assigned_rp_id === currentRp.id);
   const rpLogs = classLogs.filter(l => l.rp_id === currentRp.id);
 
+  const initialCourseId = courses[0]?.id || '';
+  const initialCentresForCourse = centres.filter(c => {
+    if (!initialCourseId) return true;
+    const isDirect = c.active_course_id === initialCourseId;
+    const inList = Array.isArray(c.course_ids) && c.course_ids.includes(initialCourseId);
+    return isDirect || inList;
+  });
+
   // Form State
   const [formData, setFormData] = useState({
-    centre_id: assignedCentres[0]?.id || '',
-    course_id: courses[0]?.id || '',
+    course_id: initialCourseId,
+    centre_id: initialCentresForCourse[0]?.id || assignedCentres[0]?.id || centres[0]?.id || '',
     class_date: new Date().toISOString().split('T')[0],
     session_type: 'REGULAR_CLASS',
     hours_spent: 2.0,
@@ -21,18 +29,42 @@ export const RPClassLogger = () => {
     travel_allowance: 0
   });
 
+  // Calculate centres running the currently selected course in form
+  const availableCentresForCourse = centres.filter(c => {
+    if (!formData.course_id) return true;
+    const isDirect = c.active_course_id === formData.course_id;
+    const inList = Array.isArray(c.course_ids) && c.course_ids.includes(formData.course_id);
+    return isDirect || inList;
+  });
+
+  const displayedCentres = availableCentresForCourse.length > 0 ? availableCentresForCourse : centres;
+
+  const handleCourseChange = (newCourseId) => {
+    const matchingCentres = centres.filter(c => {
+      const isDirect = c.active_course_id === newCourseId;
+      const inList = Array.isArray(c.course_ids) && c.course_ids.includes(newCourseId);
+      return isDirect || inList;
+    });
+
+    setFormData(prev => ({
+      ...prev,
+      course_id: newCourseId,
+      centre_id: matchingCentres[0]?.id || (prev.centre_id && centres.some(c => c.id === prev.centre_id) ? prev.centre_id : centres[0]?.id || '')
+    }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.centre_id || !formData.course_id || !formData.syllabus_covered) {
-      showToast('Please select centre, course, and topic covered', 'danger');
+    if (!formData.course_id || !formData.centre_id || !formData.syllabus_covered) {
+      showToast('Please select course, centre, and topic covered', 'danger');
       return;
     }
 
     addClassLog(formData);
     setShowLogModal(false);
     setFormData({
-      centre_id: assignedCentres[0]?.id || '',
       course_id: courses[0]?.id || '',
+      centre_id: initialCentresForCourse[0]?.id || assignedCentres[0]?.id || centres[0]?.id || '',
       class_date: new Date().toISOString().split('T')[0],
       session_type: 'REGULAR_CLASS',
       hours_spent: 2.0,
@@ -122,37 +154,48 @@ export const RPClassLogger = () => {
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
                 <div className="form-group">
-                  <label className="form-label">Study Centre <span className="required">*</span></label>
+                  <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                    1. Course / Program <span className="required">*</span>
+                  </label>
                   <select
                     className="form-select"
                     required
-                    value={formData.centre_id}
-                    onChange={e => setFormData({ ...formData, centre_id: e.target.value })}
+                    value={formData.course_id}
+                    onChange={e => handleCourseChange(e.target.value)}
+                    style={{ fontWeight: 600 }}
                   >
-                    <option value="">-- Select Study Centre --</option>
-                    {centres.map(c => (
+                    <option value="">-- Select Course --</option>
+                    {courses.map(c => (
                       <option key={c.id} value={c.id}>
-                        {c.centre_name} ({c.place})
+                        {c.title} ({c.course_code})
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Course / Program <span className="required">*</span></label>
+                  <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                    2. Study Centre (Under this Course) <span className="required">*</span>
+                  </label>
                   <select
                     className="form-select"
                     required
-                    value={formData.course_id}
-                    onChange={e => setFormData({ ...formData, course_id: e.target.value })}
+                    value={formData.centre_id}
+                    onChange={e => setFormData({ ...formData, centre_id: e.target.value })}
+                    style={{ fontWeight: 600 }}
                   >
-                    <option value="">-- Select Course --</option>
-                    {courses.map(c => (
+                    <option value="">-- Select Study Centre --</option>
+                    {displayedCentres.map(c => (
                       <option key={c.id} value={c.id}>
-                        {c.title}
+                        {c.centre_name} ({c.place}, {c.district})
                       </option>
                     ))}
                   </select>
+                  {formData.course_id && availableCentresForCourse.length === 0 && (
+                    <span className="form-helper" style={{ color: '#d97706' }}>
+                      Notice: Showing all centres as this course is not yet tagged to a specific centre.
+                    </span>
+                  )}
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
