@@ -1,15 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { ShieldCheck, GraduationCap, Users, RotateCcw, Building2 } from 'lucide-react';
+import { LoginModal } from './auth/LoginModal';
+import { ShieldCheck, GraduationCap, Users, Lock, LogOut, Building2, Cloud } from 'lucide-react';
 
 export const Navbar = () => {
-  const { activeRole, setActiveRole, currentRp, resourcePersons, setCurrentRpId, resetAllData } = useApp();
+  const {
+    activeRole,
+    setActiveRole,
+    currentUser,
+    logout,
+    currentRp,
+    isCloudConnected
+  } = useApp();
+
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   return (
     <header className="cpet-header">
       <div className="cpet-navbar">
         {/* Brand */}
-        <div className="cpet-brand" onClick={() => setActiveRole('admin')}>
+        <div className="cpet-brand" onClick={() => setActiveRole(currentUser ? (currentUser.role === 'admin' ? 'admin' : 'rp') : 'student')}>
           <div className="cpet-logo-badge">
             <Building2 size={24} />
           </div>
@@ -19,68 +29,96 @@ export const Navbar = () => {
           </div>
         </div>
 
-        {/* Global Role Switcher */}
-        <div className="role-switcher">
-          <button
-            className={`role-btn ${activeRole === 'admin' ? 'active admin' : ''}`}
-            onClick={() => setActiveRole('admin')}
-            title="Super Admin Master Control"
-          >
-            <ShieldCheck size={16} />
-            <span>Super Admin</span>
-          </button>
-
-          <button
-            className={`role-btn ${activeRole === 'rp' ? 'active rp' : ''}`}
-            onClick={() => setActiveRole('rp')}
-            title="Resource Person / Teacher Portal"
-          >
-            <GraduationCap size={16} />
-            <span>RP Portal</span>
-          </button>
-
-          <button
-            className={`role-btn ${activeRole === 'student' ? 'active' : ''}`}
-            onClick={() => setActiveRole('student')}
-            title="Student Phone Lookup & Admissions"
-          >
-            <Users size={16} />
-            <span>Student & Public</span>
-          </button>
-        </div>
-
-        {/* Right Actions / RP Selector if in RP mode */}
+        {/* Navigation & Role Area */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {activeRole === 'rp' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', background: '#f1f5f9', padding: '0.35rem 0.75rem', borderRadius: '20px' }}>
-              <span style={{ color: '#64748b' }}>Teacher:</span>
-              <select
-                value={currentRp.id}
-                onChange={(e) => setCurrentRpId(e.target.value)}
-                style={{ border: 'none', background: 'transparent', fontWeight: 700, color: 'var(--cpet-primary)', cursor: 'pointer', outline: 'none' }}
+          {/* If Logged In as Super Admin */}
+          {currentUser && currentUser.role === 'admin' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div className="role-switcher">
+                <button
+                  className={`role-btn ${activeRole === 'admin' ? 'active admin' : ''}`}
+                  onClick={() => setActiveRole('admin')}
+                >
+                  <ShieldCheck size={15} />
+                  <span>Admin Suite</span>
+                </button>
+                <button
+                  className={`role-btn ${activeRole === 'student' ? 'active' : ''}`}
+                  onClick={() => setActiveRole('student')}
+                >
+                  <Users size={15} />
+                  <span>Public View</span>
+                </button>
+              </div>
+
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={logout}
+                title="Sign out of Super Admin"
+                style={{ color: '#b91c1c' }}
               >
-                {resourcePersons.map(rp => (
-                  <option key={rp.id} value={rp.id}>{rp.full_name}</option>
-                ))}
-              </select>
+                <LogOut size={14} />
+                <span className="hide-on-mobile">Logout</span>
+              </button>
             </div>
           )}
 
-          <button
-            onClick={() => {
-              if (window.confirm('Reset all demo courses, centres, and student records to defaults?')) {
-                resetAllData();
-              }
-            }}
-            className="btn btn-secondary btn-sm"
-            title="Reset demo data"
-            style={{ color: '#64748b' }}
-          >
-            <RotateCcw size={14} />
-            <span className="hide-on-mobile">Reset Data</span>
-          </button>
+          {/* If Logged In as Resource Person */}
+          {currentUser && currentUser.role === 'rp' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div className="role-switcher">
+                <button
+                  className={`role-btn ${activeRole === 'rp' ? 'active rp' : ''}`}
+                  onClick={() => setActiveRole('rp')}
+                >
+                  <GraduationCap size={15} />
+                  <span>{currentRp?.full_name?.split(' ')[0] || 'Teacher'} Portal</span>
+                </button>
+                <button
+                  className={`role-btn ${activeRole === 'student' ? 'active' : ''}`}
+                  onClick={() => setActiveRole('student')}
+                >
+                  <Users size={15} />
+                  <span>Public View</span>
+                </button>
+              </div>
+
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={logout}
+                title="Sign out of Teacher Portal"
+                style={{ color: '#b91c1c' }}
+              >
+                <LogOut size={14} />
+                <span className="hide-on-mobile">Logout</span>
+              </button>
+            </div>
+          )}
+
+          {/* If NOT Logged In (Public / Students) */}
+          {!currentUser && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              {isCloudConnected && (
+                <span className="badge badge-success hide-on-mobile" style={{ fontSize: '0.72rem' }}>
+                  <Cloud size={12} /> Cloud Connected
+                </span>
+              )}
+
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => setShowLoginModal(true)}
+                style={{ background: 'var(--cpet-primary)', fontSize: '0.82rem' }}
+              >
+                <Lock size={13} />
+                <span>Office & Faculty Login</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Login Modal */}
+      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
     </header>
   );
 };

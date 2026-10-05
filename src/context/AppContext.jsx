@@ -44,10 +44,23 @@ export const AppProvider = ({ children }) => {
   const [remittances, setRemittances] = useState(() => getStored(STORAGE_KEYS.REMITTANCES, initialRemittances));
   const [payouts, setPayouts] = useState(() => getStored(STORAGE_KEYS.PAYOUTS, initialPayouts));
   
-  // Active view role: 'admin' | 'rp' | 'student'
-  const [activeRole, setActiveRole] = useState(() => getStored(STORAGE_KEYS.ACTIVE_ROLE, 'admin'));
-  // Currently simulated RP
-  const [currentRpId, setCurrentRpId] = useState(() => getStored(STORAGE_KEYS.CURRENT_RP_ID, 'rp-1'));
+  // Authentication state
+  const [currentUser, setCurrentUser] = useState(() => getStored('cpet_current_user_v1', null));
+
+  // Active view role: 'admin' | 'rp' | 'student'. Defaults to 'student' if not authenticated!
+  const [activeRole, setActiveRole] = useState(() => {
+    const user = getStored('cpet_current_user_v1', null);
+    if (user?.role === 'admin') return 'admin';
+    if (user?.role === 'rp') return 'rp';
+    return 'student';
+  });
+
+  // Currently logged-in RP
+  const [currentRpId, setCurrentRpId] = useState(() => {
+    const user = getStored('cpet_current_user_v1', null);
+    return user?.role === 'rp' ? user.id : 'rp-1';
+  });
+
   const [isCloudConnected, setIsCloudConnected] = useState(false);
 
   // Notification Toast state
@@ -59,6 +72,40 @@ export const AppProvider = ({ children }) => {
       setToast(null);
     }, 4000);
   };
+
+  // Login Methods
+  const loginAdmin = (username, password) => {
+    if (username.toLowerCase() === 'cpet@dhiu.in' && password === 'cpet@1986') {
+      const user = { role: 'admin', email: 'cpet@dhiu.in', name: 'Super Admin' };
+      setCurrentUser(user);
+      setActiveRole('admin');
+      localStorage.setItem('cpet_current_user_v1', JSON.stringify(user));
+      return true;
+    }
+    return false;
+  };
+
+  const loginRp = (phone, password) => {
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    const rp = resourcePersons.find(r => r.phone.replace(/\D/g, '').slice(-10) === cleanPhone && r.password === password);
+    if (rp) {
+      const user = { role: 'rp', id: rp.id, phone: rp.phone, name: rp.full_name };
+      setCurrentUser(user);
+      setCurrentRpId(rp.id);
+      setActiveRole('rp');
+      localStorage.setItem('cpet_current_user_v1', JSON.stringify(user));
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => {
+    setCurrentUser(null);
+    setActiveRole('student');
+    localStorage.removeItem('cpet_current_user_v1');
+    showToast('Logged out of authorized portal.');
+  };
+
 
   // Helper to sync to MongoDB if cloud is active
   const syncToCloud = (entityName, item) => {
@@ -513,6 +560,10 @@ export const AppProvider = ({ children }) => {
         currentRp,
         currentRpId,
         setCurrentRpId,
+        currentUser,
+        loginAdmin,
+        loginRp,
+        logout,
         isCloudConnected,
         toast,
         showToast,

@@ -6,6 +6,7 @@ import { StudentsMasterDirectory } from './StudentsMasterDirectory';
 import { RemunerationAudits } from './RemunerationAudits';
 import { FinanceReconciliations } from './FinanceReconciliations';
 import { EventCheckInDesk } from './EventCheckInDesk';
+import { RPManager } from './RPManager';
 import {
   LayoutDashboard,
   BookOpen,
@@ -81,6 +82,14 @@ export const AdminDashboard = () => {
         >
           <CreditCard size={16} />
           <span>Fee Remittance {pendingRemittances.length > 0 && `(${pendingRemittances.length})`}</span>
+        </button>
+
+        <button
+          className={`tab-btn ${activeTab === 'faculty' ? 'active' : ''}`}
+          onClick={() => setActiveTab('faculty')}
+        >
+          <GraduationCap size={16} />
+          <span>Faculty (RPs)</span>
         </button>
 
         <button
@@ -237,6 +246,7 @@ export const AdminDashboard = () => {
       {activeTab === 'students' && <StudentsMasterDirectory />}
       {activeTab === 'remuneration' && <RemunerationAudits />}
       {activeTab === 'finance' && <FinanceReconciliations />}
+      {activeTab === 'faculty' && <RPManager />}
       {activeTab === 'eventdesk' && <EventCheckInDesk />}
     </div>
   );
