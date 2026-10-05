@@ -1,9 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Building, Plus, CheckCircle, Clock } from 'lucide-react';
+import { Building, Plus, CheckCircle, Clock, BookOpen } from 'lucide-react';
 
 export const RPNewCentreForm = ({ onCentreCreated }) => {
-  const { currentRp, addCentre, showToast } = useApp();
+  const { currentRp, courses, addCentre, showToast } = useApp();
+
+  const mahalluCourses = courses.filter(c => c.category === 'MAHALLU');
+  const availableCourses = mahalluCourses.length > 0 ? mahalluCourses : courses;
+  const [selectedCourseId, setSelectedCourseId] = useState(availableCourses[0]?.id || '');
+
+  useEffect(() => {
+    if (!selectedCourseId && availableCourses.length > 0) {
+      setSelectedCourseId(availableCourses[0].id);
+    }
+  }, [availableCourses, selectedCourseId]);
+
   const [formData, setFormData] = useState({
     centre_name: '',
     place: '',
@@ -18,6 +29,8 @@ export const RPNewCentreForm = ({ onCentreCreated }) => {
 
   const districts = ['Malappuram', 'Kozhikode', 'Kannur', 'Thrissur', 'Palakkad', 'Wayanad', 'Kasaragod', 'Ernakulam', 'Kollam'];
 
+  const selectedCourse = courses.find(c => c.id === selectedCourseId);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.centre_name || !formData.place) {
@@ -27,6 +40,8 @@ export const RPNewCentreForm = ({ onCentreCreated }) => {
 
     addCentre({
       ...formData,
+      active_course_id: selectedCourseId,
+      course_ids: selectedCourseId ? [selectedCourseId] : [],
       founded_by_rp_id: currentRp.id,
       founded_by_rp_name: currentRp.full_name,
       assigned_rp_id: currentRp.id,
@@ -63,6 +78,45 @@ export const RPNewCentreForm = ({ onCentreCreated }) => {
       </div>
 
       <form onSubmit={handleSubmit}>
+        {/* Course Selection */}
+        <div className="form-group" style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--cpet-border)' }}>
+          <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, color: 'var(--cpet-primary)' }}>
+            <BookOpen size={16} />
+            Starting Course for this Mahallu <span className="required">*</span>
+          </label>
+          {availableCourses.length === 0 ? (
+            <p style={{ fontSize: '0.82rem', color: '#dc2626', margin: 0 }}>
+              No Mahallu courses configured yet. Please ask Super Admin to create a course first.
+            </p>
+          ) : (
+            <div>
+              <select
+                className="form-select"
+                required
+                value={selectedCourseId}
+                onChange={e => setSelectedCourseId(e.target.value)}
+                style={{ fontWeight: 600 }}
+              >
+                {availableCourses.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.title} ({c.course_code}) — {c.standard_fee > 0 ? `₹${c.standard_fee}` : 'FREE'}
+                  </option>
+                ))}
+              </select>
+
+              {selectedCourse && (
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', fontSize: '0.78rem', color: '#64748b' }}>
+                  <span>Syllabus: <strong>{selectedCourse.total_planned_classes} Classes</strong></span>
+                  <span>•</span>
+                  <span>Evaluation: <strong>{selectedCourse.evaluation_type?.replace('_', ' ')}</strong></span>
+                  <span>•</span>
+                  <span>Fee: <strong>{selectedCourse.standard_fee > 0 ? `₹${selectedCourse.standard_fee}` : 'Free'}</strong></span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="form-group">
           <label className="form-label">Centre Title <span className="required">*</span></label>
           <input

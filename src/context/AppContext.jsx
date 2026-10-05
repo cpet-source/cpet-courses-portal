@@ -400,10 +400,15 @@ export const AppProvider = ({ children }) => {
   // 2. Study Centre Management
   const addCentre = (centreData) => {
     const newCode = `MHL-${(centreData.district || 'KRL').substring(0, 3).toUpperCase()}-${String(centres.length + 1).padStart(3, '0')}`;
+    const initialCourseId = centreData.active_course_id || centreData.course_ids?.[0] || '';
+    const initialCourseIds = centreData.course_ids || (initialCourseId ? [initialCourseId] : []);
+
     const newCentre = {
       ...centreData,
       id: `ctr-${Date.now()}`,
       centre_code: newCode,
+      active_course_id: initialCourseId,
+      course_ids: initialCourseIds,
       status: activeRole === 'admin' ? 'ACTIVE' : 'PENDING_APPROVAL'
     };
     setCentres(prev => [newCentre, ...prev]);
@@ -414,6 +419,24 @@ export const AppProvider = ({ children }) => {
         : `New Study Centre registered! Sent to CPET Office for approval.`
     );
     return newCentre;
+  };
+
+  const addCourseToCentre = (centreId, courseId) => {
+    setCentres(prev => prev.map(c => {
+      if (c.id === centreId) {
+        const existingIds = c.course_ids || (c.active_course_id ? [c.active_course_id] : []);
+        const newCourseIds = Array.from(new Set([...existingIds, courseId]));
+        const updated = {
+          ...c,
+          active_course_id: courseId,
+          course_ids: newCourseIds
+        };
+        syncToCloud('Centre', updated);
+        return updated;
+      }
+      return c;
+    }));
+    showToast('Course assigned to Study Centre successfully!');
   };
 
 
@@ -764,6 +787,7 @@ export const AppProvider = ({ children }) => {
         addCourse,
         updateCourse,
         addCentre,
+        addCourseToCentre,
         updateCentreStatus,
         assignRpToCentre,
         addResourcePerson,

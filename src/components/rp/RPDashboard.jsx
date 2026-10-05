@@ -90,8 +90,8 @@ export const RPDashboard = () => {
           className={`tab-btn ${activeTab === 'students' ? 'active' : ''}`}
           onClick={() => setActiveTab('students')}
         >
-          <Users size={16} />
-          <span>Centre Students</span>
+          <GraduationCap size={16} />
+          <span>Courses & Students</span>
         </button>
 
         <button
@@ -113,7 +113,9 @@ export const RPDashboard = () => {
 
       {/* Tab Views */}
       {activeTab === 'classes' && <RPClassLogger />}
-      {activeTab === 'students' && <RPCentreStudents />}
+      {activeTab === 'students' && (
+        <RPCentreStudents onNavigateToNewCentre={() => setActiveTab('newcentre')} />
+      )}
       {activeTab === 'remittance' && <RPFeeRemittance />}
       {activeTab === 'newcentre' && <RPNewCentreForm onCentreCreated={() => setActiveTab('students')} />}
     </div>

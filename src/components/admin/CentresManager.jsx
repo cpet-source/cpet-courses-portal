@@ -35,6 +35,7 @@ export const CentresManager = () => {
 
     addCentre({
       ...formData,
+      course_ids: formData.active_course_id ? [formData.active_course_id] : [],
       founded_by_rp_id: formData.assigned_rp_id,
       founded_by_rp_name: resourcePersons.find(r => r.id === formData.assigned_rp_id)?.full_name || 'CPET Office'
     });
@@ -117,8 +118,10 @@ export const CentresManager = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.25rem' }}>
         {filteredCentres.map(centre => {
           const studentCount = enrollments.filter(e => e.centre_id === centre.id).length;
-          const assignedRp = resourcePersons.find(r => r.id === centre.assigned_rp_id);
-          const activeCourse = courses.find(c => c.id === centre.active_course_id);
+          const centreCourses = courses.filter(c =>
+            c.id === centre.active_course_id ||
+            (Array.isArray(centre.course_ids) && centre.course_ids.includes(c.id))
+          );
 
           return (
             <div key={centre.id} className="cpet-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -145,10 +148,18 @@ export const CentresManager = () => {
                 {/* Info Block */}
                 <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', marginBottom: '1rem', border: '1px solid var(--cpet-border)' }}>
                   <div style={{ marginBottom: '0.5rem' }}>
-                    <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Active Course Running:</span>
-                    <strong style={{ color: 'var(--cpet-primary)' }}>
-                      {activeCourse ? activeCourse.title : 'No Course Assigned'}
-                    </strong>
+                    <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block', marginBottom: '3px' }}>Courses Running:</span>
+                    {centreCourses.length > 0 ? (
+                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        {centreCourses.map(c => (
+                          <span key={c.id} className="badge badge-accent" style={{ fontSize: '0.72rem' }}>
+                            {c.title}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <strong style={{ color: '#94a3b8', fontSize: '0.82rem' }}>No Course Assigned</strong>
+                    )}
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', borderTop: '1px solid #edf2f7', paddingTop: '0.5rem' }}>
