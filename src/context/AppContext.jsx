@@ -62,6 +62,7 @@ export const AppProvider = ({ children }) => {
   });
 
   const [isCloudConnected, setIsCloudConnected] = useState(false);
+  const [cloudError, setCloudError] = useState(null);
 
   // Notification Toast state
   const [toast, setToast] = useState(null);
@@ -106,18 +107,72 @@ export const AppProvider = ({ children }) => {
     showToast('Logged out of authorized portal.');
   };
 
-  // Helper to sync to MongoDB if cloud is active
-  const syncToCloud = (entityName, item) => {
+  // Helper to sync single item to MongoDB
+  const syncToCloud = async (entityName, item) => {
     try {
-      fetch('/api/data', {
+      const res = await fetch('/api/data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'SYNC_ENTITY',
           payload: { entityName, item }
         })
-      }).catch(() => {});
-    } catch (e) {}
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        setIsCloudConnected(true);
+        setCloudError(null);
+        return true;
+      } else {
+        if (data?.error) {
+          console.warn('MongoDB Cloud Sync notice:', data.error);
+          setCloudError(data.error);
+        }
+        return false;
+      }
+    } catch (e) {
+      console.warn('Network sync error:', e);
+      return false;
+    }
+  };
+
+  // Sync all local data to MongoDB cloud (e.g. after fixing credentials)
+  const syncAllLocalDataToCloud = async () => {
+    try {
+      showToast('Syncing all courses and records to MongoDB Atlas...', 'info');
+      const res = await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'SYNC_ALL',
+          payload: {
+            courses,
+            centres,
+            resourcePersons,
+            students,
+            enrollments,
+            classLogs,
+            remittances,
+            payouts
+          }
+        })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        setIsCloudConnected(true);
+        setCloudError(null);
+        showToast('All records successfully synchronized to MongoDB Cloud!', 'success');
+        return true;
+      } else {
+        const errMsg = data?.error || 'Database rejected connection';
+        setCloudError(errMsg);
+        showToast(`Cloud sync failed: ${errMsg}`, 'danger');
+        return false;
+      }
+    } catch (e) {
+      showToast(`Network error syncing to cloud: ${e.message}`, 'danger');
+      return false;
+    }
   };
 
   // Check MongoDB connection on mount
@@ -125,23 +180,46 @@ export const AppProvider = ({ children }) => {
     fetch('/api/data')
       .then(r => r.json())
       .then(res => {
-        if (res && res.connected && res.data) {
-          setIsCloudConnected(true);
-          const d = res.data;
-          setCourses(d.courses || []);
-          setCentres(d.centres || []);
-          setResourcePersons(d.resourcePersons || []);
-          setStudents(d.students || []);
-          setEnrollments(d.enrollments || []);
-          setClassLogs(d.classLogs || []);
-          setRemittances(d.remittances || []);
-          setPayouts(d.payouts || []);
+        if (res) {
+          if (res.connected && res.data) {
+            setIsCloudConnected(true);
+            setCloudError(null);
+            const d = res.data;
+            if (d.courses && d.courses.length > 0) {
+              setCourses(d.courses);
+            } else if (courses.length > 0) {
+              // Auto-sync existing local courses so they aren't lost
+              fetch('/api/data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'SYNC_ALL',
+                  payload: { courses, centres, resourcePersons, students, enrollments, classLogs, remittances, payouts }
+                })
+              }).catch(() => {});
+            }
+
+            if (d.centres && d.centres.length > 0) setCentres(d.centres);
+            if (d.resourcePersons && d.resourcePersons.length > 0) setResourcePersons(d.resourcePersons);
+            if (d.students && d.students.length > 0) setStudents(d.students);
+            if (d.enrollments && d.enrollments.length > 0) setEnrollments(d.enrollments);
+            if (d.classLogs && d.classLogs.length > 0) setClassLogs(d.classLogs);
+            if (d.remittances && d.remittances.length > 0) setRemittances(d.remittances);
+            if (d.payouts && d.payouts.length > 0) setPayouts(d.payouts);
+          } else {
+            setIsCloudConnected(false);
+            if (res.error) {
+              setCloudError(res.error);
+            }
+          }
         }
       })
-      .catch(() => {
-        // Local mode
+      .catch(err => {
+        setIsCloudConnected(false);
+        setCloudError(err.message);
       });
   }, []);
+
 
 
 
@@ -212,21 +290,34 @@ export const AppProvider = ({ children }) => {
 
   // 1. Course Management
   const addCourse = (courseData) => {
+    const rawSlug = courseData.slug || courseData.title || courseData.course_code;
+    const slug = rawSlug
+      ? rawSlug.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      : `course-${Date.now()}`;
+
     const newCourse = {
       ...courseData,
-      id: `crs-${Date.now()}`,
+      slug,
+      id: courseData.id || `crs-${Date.now()}`,
       status: 'ACTIVE'
     };
     setCourses(prev => [newCourse, ...prev]);
-    syncToCloud('Course', newCourse);
-    showToast(`Course "${newCourse.title}" created successfully!`);
+    syncToCloud('Course', newCourse).then(synced => {
+      if (synced) {
+        showToast(`Course "${newCourse.title}" published & synced to cloud!`);
+      } else {
+        showToast(`Course "${newCourse.title}" created locally. (Notice: MongoDB cloud sync pending)`, 'warning');
+      }
+    });
     return newCourse;
   };
 
   const updateCourse = (id, updatedFields) => {
     setCourses(prev => prev.map(c => {
       if (c.id === id) {
-        const updated = { ...c, ...updatedFields };
+        const rawSlug = updatedFields.slug || updatedFields.title || c.slug || c.title;
+        const slug = rawSlug ? rawSlug.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : c.slug;
+        const updated = { ...c, ...updatedFields, slug };
         syncToCloud('Course', updated);
         return updated;
       }
@@ -551,6 +642,8 @@ export const AppProvider = ({ children }) => {
         loginRp,
         logout,
         isCloudConnected,
+        cloudError,
+        syncAllLocalDataToCloud,
         toast,
         showToast,
         resetAllData,

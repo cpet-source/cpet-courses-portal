@@ -21,12 +21,28 @@ import {
   MapPin,
   TrendingUp,
   ArrowRight,
-  RotateCcw
+  RotateCcw,
+  Cloud,
+  HelpCircle,
+  CheckCircle2,
+  ExternalLink
 } from 'lucide-react';
 
 export const AdminDashboard = () => {
-  const { courses, centres, enrollments, classLogs, remittances, resourcePersons, resetAllData } = useApp();
+  const {
+    courses,
+    centres,
+    enrollments,
+    classLogs,
+    remittances,
+    resourcePersons,
+    resetAllData,
+    isCloudConnected,
+    cloudError,
+    syncAllLocalDataToCloud
+  } = useApp();
   const [activeTab, setActiveTab] = useState('overview');
+  const [showDbGuideModal, setShowDbGuideModal] = useState(false);
 
   // Pending counts
   const pendingCentres = centres.filter(c => c.status === 'PENDING_APPROVAL');
@@ -105,6 +121,54 @@ export const AdminDashboard = () => {
       {/* Main Admin Tab Views */}
       {activeTab === 'overview' && (
         <div>
+          {/* Cloud Database Status Banner */}
+          <div style={{
+            background: isCloudConnected ? '#f0fdf4' : '#fffbeb',
+            border: `1px solid ${isCloudConnected ? '#bbf7d0' : '#fde68a'}`,
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.25rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                <Cloud size={20} style={{ color: isCloudConnected ? '#16a34a' : '#d97706' }} />
+                <h4 style={{ margin: 0, fontWeight: 800, color: isCloudConnected ? '#166534' : '#92400e', fontSize: '1.05rem' }}>
+                  {isCloudConnected ? 'MongoDB Cloud Database: Connected & Live' : 'MongoDB Cloud Database: Sync Attention Needed'}
+                </h4>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.84rem', color: isCloudConnected ? '#15803d' : '#b45309' }}>
+                {isCloudConnected
+                  ? 'All courses, Mahallu centres, and student records are securely synced across all public devices and phones.'
+                  : (cloudError
+                      ? `Issue: "${cloudError}". Any courses created are currently stored safely in this browser only. To publish them publicly, verify your Vercel credentials.`
+                      : 'Connecting to MongoDB Atlas... If taking longer than usual, your Vercel database credentials may need verification.')}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={syncAllLocalDataToCloud}
+                style={{ background: isCloudConnected ? 'var(--cpet-primary)' : '#d97706' }}
+              >
+                <Cloud size={14} /> Sync Local Data to Cloud
+              </button>
+              {!isCloudConnected && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setShowDbGuideModal(true)}
+                >
+                  <HelpCircle size={14} /> How to Fix Credentials
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Action Banners */}
           {(pendingCentres.length > 0 || pendingLogs.length > 0 || pendingRemittances.length > 0) && (
             <div style={{ background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 'var(--radius-lg)', padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -270,6 +334,58 @@ export const AdminDashboard = () => {
       {activeTab === 'finance' && <FinanceReconciliations />}
       {activeTab === 'faculty' && <RPManager />}
       {activeTab === 'eventdesk' && <EventCheckInDesk />}
+
+      {/* Database Credentials Fix Modal */}
+      {showDbGuideModal && (
+        <div className="modal-overlay" onClick={() => setShowDbGuideModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '640px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Cloud size={20} style={{ color: 'var(--cpet-accent)' }} />
+                <h3>Fix MongoDB Cloud Connection in 3 Steps</h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setShowDbGuideModal(false)}>✕</button>
+            </div>
+
+            <div style={{ padding: '1.25rem', fontSize: '0.88rem', lineHeight: 1.6, color: '#334155' }}>
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--cpet-border)', marginBottom: '1.25rem' }}>
+                <p style={{ margin: 0, fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                  Current Status: <span style={{ color: '#dc2626' }}>{cloudError || 'Authentication Failed'}</span>
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                  This happens when the MongoDB Atlas Database User password does not match or contains special characters like <code>@</code> or <code>#</code>.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ borderLeft: '3px solid var(--cpet-accent)', paddingLeft: '0.75rem' }}>
+                  <strong style={{ display: 'block', color: 'var(--cpet-primary)' }}>1. Check Database User in MongoDB Atlas</strong>
+                  <span>Go to <a href="https://cloud.mongodb.com" target="_blank" rel="noreferrer" style={{ color: 'var(--cpet-accent)', textDecoration: 'underline' }}>MongoDB Atlas</a> → Click <strong>Database Access</strong> on left sidebar. Ensure a user exists (e.g. <code>cpet_admin</code>), click <strong>Edit</strong> → set password (e.g. <code>CPETportal2026</code>) and ensure role is "Read and write to any database".</span>
+                </div>
+
+                <div style={{ borderLeft: '3px solid var(--cpet-accent)', paddingLeft: '0.75rem' }}>
+                  <strong style={{ display: 'block', color: 'var(--cpet-primary)' }}>2. Update MONGODB_URI in Vercel</strong>
+                  <span>Go to <a href="https://vercel.com" target="_blank" rel="noreferrer" style={{ color: 'var(--cpet-accent)', textDecoration: 'underline' }}>Vercel</a> → Project <strong>cpet-courses-portal</strong> → <strong>Settings</strong> → <strong>Environment Variables</strong>. Edit <code>MONGODB_URI</code> to:</span>
+                  <pre style={{ background: '#0f172a', color: '#38bdf8', padding: '0.75rem', borderRadius: '6px', fontSize: '0.75rem', overflowX: 'auto', margin: '6px 0 0' }}>
+mongodb+srv://YOUR_USER:YOUR_PASSWORD@cpet-portal.fw7o9tr.mongodb.net/cpet_prod?retryWrites=true&w=majority&appName=CPET-Portal
+                  </pre>
+                </div>
+
+                <div style={{ borderLeft: '3px solid var(--cpet-accent)', paddingLeft: '0.75rem' }}>
+                  <strong style={{ display: 'block', color: 'var(--cpet-primary)' }}>3. Redeploy in Vercel & Sync Data</strong>
+                  <span>In Vercel, go to <strong>Deployments</strong> → Click the three dots (<code>...</code>) on the latest deployment → Click <strong>Redeploy</strong>. Once finished, refresh this page and click <strong>Sync Local Data to Cloud</strong> above!</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ justifyContent: 'flex-end' }}>
+              <button className="btn btn-primary" onClick={() => setShowDbGuideModal(false)}>
+                Got it, Close Guide
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

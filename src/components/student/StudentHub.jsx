@@ -1,19 +1,74 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { CourseCatalog } from './CourseCatalog';
 import { CourseRegistrationForm } from './CourseRegistrationForm';
-import { Search, UserCheck, GraduationCap, Award, BookOpen, CheckCircle, Clock, Calendar, ArrowRight, ShieldCheck, Plus } from 'lucide-react';
+import { Search, UserCheck, GraduationCap, Award, BookOpen, CheckCircle, Clock, Calendar, ArrowRight, ShieldCheck, Plus, AlertCircle, ArrowLeft } from 'lucide-react';
 
 export const StudentHub = () => {
-  const { lookupStudentByPhone, enrollments, courses, centres } = useApp();
+  const { lookupStudentByPhone, enrollments, courses, centres, showToast } = useApp();
   const [phoneSearch, setPhoneSearch] = useState('');
   const [accountData, setAccountData] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
 
-  // Registration View state
+  // Deep link detection state
   const [registeringCourse, setRegisteringCourse] = useState(null);
-  const [viewMode, setViewMode] = useState('lookup'); // 'lookup' | 'catalog' | 'register'
+  const [deepLinkNotFound, setDeepLinkNotFound] = useState(false);
+
+  // Default viewMode: If a course query parameter is present, start in 'register', otherwise 'catalog'
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return (params.get('course') || params.get('slug') || params.get('id') || params.get('c')) ? 'register' : 'catalog';
+    } catch (e) {
+      return 'catalog';
+    }
+  });
+
+  // Parse and match course from URL parameters (?course=... or ?slug=... or ?id=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const slugOrId = params.get('course') || params.get('slug') || params.get('id') || params.get('c');
+
+    if (slugOrId) {
+      const cleanTarget = slugOrId.toLowerCase().trim();
+      const matched = courses.find(c =>
+        (c.slug && c.slug.toLowerCase() === cleanTarget) ||
+        (c.id && c.id.toLowerCase() === cleanTarget) ||
+        (c.course_code && c.course_code.toLowerCase() === cleanTarget)
+      );
+
+      if (matched) {
+        setRegisteringCourse(matched);
+        setViewMode('register');
+        setDeepLinkNotFound(false);
+      } else if (courses.length > 0) {
+        setDeepLinkNotFound(true);
+        setViewMode('catalog');
+      }
+    }
+  }, [courses]);
+
+  const handleSelectCourse = (course) => {
+    setRegisteringCourse(course);
+    setViewMode('register');
+    setDeepLinkNotFound(false);
+    if (window.history.pushState) {
+      const newUrl = `${window.location.pathname}?course=${course.slug || course.id}`;
+      window.history.pushState({ path: newUrl }, '', newUrl);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleBackToCatalog = () => {
+    setRegisteringCourse(null);
+    setViewMode('catalog');
+    setDeepLinkNotFound(false);
+    if (window.history.pushState) {
+      const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+      window.history.pushState({ path: newUrl }, '', newUrl);
+    }
+  };
 
   const handleLookup = (e) => {
     if (e) e.preventDefault();
@@ -37,40 +92,58 @@ export const StudentHub = () => {
       {/* Sub Navigation */}
       <div className="cpet-tabs" style={{ marginBottom: '1.5rem' }}>
         <button
+          className={`tab-btn ${viewMode === 'catalog' || viewMode === 'register' ? 'active' : ''}`}
+          onClick={handleBackToCatalog}
+        >
+          <BookOpen size={16} />
+          <span>Browse & Apply for Courses ({courses.length})</span>
+        </button>
+        <button
           className={`tab-btn ${viewMode === 'lookup' ? 'active' : ''}`}
           onClick={() => { setViewMode('lookup'); setRegisteringCourse(null); }}
         >
           <Search size={16} />
-          <span>Student Phone Lookup</span>
-        </button>
-        <button
-          className={`tab-btn ${viewMode === 'catalog' ? 'active' : ''}`}
-          onClick={() => { setViewMode('catalog'); setRegisteringCourse(null); }}
-        >
-          <BookOpen size={16} />
-          <span>Browse Available Courses</span>
+          <span>Student Results & Attendance</span>
         </button>
       </div>
 
+      {deepLinkNotFound && (
+        <div style={{ background: '#fffbeb', border: '1px solid #fef3c7', color: '#b45309', padding: '0.85rem 1.25rem', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.88rem' }}>
+          <AlertCircle size={18} />
+          <span>The requested course link is currently not available. Please explore all active courses below:</span>
+        </div>
+      )}
+
       {viewMode === 'catalog' && (
         <CourseCatalog
-          onSelectCourse={(course) => {
-            setRegisteringCourse(course);
-            setViewMode('register');
-          }}
+          onSelectCourse={handleSelectCourse}
         />
       )}
 
-      {viewMode === 'register' && registeringCourse && (
-        <CourseRegistrationForm
-          course={registeringCourse}
-          onBack={() => setViewMode('catalog')}
-          onComplete={(newEnrollment) => {
-            setPhoneSearch(newEnrollment.account_phone);
-            handleLookup();
-            setViewMode('lookup');
-          }}
-        />
+      {viewMode === 'register' && (
+        registeringCourse ? (
+          <CourseRegistrationForm
+            course={registeringCourse}
+            onBack={handleBackToCatalog}
+            onComplete={(newEnrollment) => {
+              setPhoneSearch(newEnrollment.account_phone);
+              handleLookup();
+              setViewMode('lookup');
+              showToast(`Registration confirmed! Admission No: ${newEnrollment.admission_number}`);
+            }}
+          />
+        ) : (
+          <div className="cpet-card" style={{ maxWidth: '680px', margin: '2rem auto', textAlign: 'center', padding: '2.5rem' }}>
+            <div className="loading-spinner" style={{ margin: '0 auto 1rem' }} />
+            <h3 style={{ color: 'var(--cpet-primary)', marginBottom: '0.5rem' }}>Loading Course Registration...</h3>
+            <p style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+              Fetching latest intake details from CPET database.
+            </p>
+            <button className="btn btn-secondary btn-sm" onClick={handleBackToCatalog}>
+              <ArrowLeft size={14} /> Back to All Courses
+            </button>
+          </div>
+        )
       )}
 
       {viewMode === 'lookup' && (

@@ -17,29 +17,33 @@ export async function connectToDatabase() {
   }
 
   if (!MONGODB_URI) {
-    console.warn('MONGODB_URI is not defined in environment variables. Falling back to in-memory mode.');
+    console.warn('MONGODB_URI is not defined in environment variables.');
     return null;
   }
 
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 5000
+      serverSelectionTimeoutMS: 6000,
+      connectTimeoutMS: 6000
     };
 
     cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongooseInstance) => {
       console.log('Connected to MongoDB Atlas successfully.');
       return mongooseInstance;
+    }).catch((err) => {
+      cached.promise = null;
+      console.error('Mongoose connection failed:', err.message);
+      throw err;
     });
   }
 
   try {
     cached.conn = await cached.promise;
+    return cached.conn;
   } catch (e) {
     cached.promise = null;
-    console.error('MongoDB connection error:', e);
     throw e;
   }
-
-  return cached.conn;
 }
+

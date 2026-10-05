@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { LoginModal } from './auth/LoginModal';
-import { ShieldCheck, GraduationCap, Users, Lock, LogOut, Building2, Cloud } from 'lucide-react';
+import { ShieldCheck, GraduationCap, Users, Lock, LogOut, Building2, Cloud, AlertCircle } from 'lucide-react';
 
 export const Navbar = () => {
   const {
@@ -10,7 +10,8 @@ export const Navbar = () => {
     currentUser,
     logout,
     currentRp,
-    isCloudConnected
+    isCloudConnected,
+    cloudError
   } = useApp();
 
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -34,6 +35,15 @@ export const Navbar = () => {
           {/* If Logged In as Super Admin */}
           {currentUser && currentUser.role === 'admin' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {isCloudConnected ? (
+                <span className="badge badge-success hide-on-mobile" style={{ fontSize: '0.72rem' }}>
+                  <Cloud size={12} /> Cloud Active
+                </span>
+              ) : (
+                <span className="badge badge-warning hide-on-mobile" style={{ fontSize: '0.72rem' }} title={cloudError || 'Cloud sync pending'}>
+                  <AlertCircle size={12} /> Local Mode
+                </span>
+              )}
               <div className="role-switcher">
                 <button
                   className={`role-btn ${activeRole === 'admin' ? 'active admin' : ''}`}

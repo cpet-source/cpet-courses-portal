@@ -25,13 +25,44 @@ export default async function handler(req, res) {
     return;
   }
 
+  let db = null;
+  let dbError = null;
+
   try {
-    const db = await connectToDatabase();
+    db = await connectToDatabase();
+  } catch (err) {
+    dbError = err.message;
+    console.error('API MongoDB connection error:', err.message);
+  }
+
+  try {
     if (!db) {
-      return res.status(200).json({
-        connected: false,
-        message: 'No MONGODB_URI configured. Running in client storage mode.'
-      });
+      if (req.method === 'GET') {
+        return res.status(200).json({
+          connected: false,
+          error: dbError || 'MONGODB_URI not configured',
+          message: 'Running in fallback client storage mode.',
+          data: {
+            courses: [],
+            centres: [],
+            resourcePersons: [],
+            students: [],
+            enrollments: [],
+            classLogs: [],
+            remittances: [],
+            payouts: []
+          }
+        });
+      }
+
+      if (req.method === 'POST') {
+        return res.status(200).json({
+          success: false,
+          connected: false,
+          error: dbError || 'Database connection unavailable',
+          message: 'Could not sync to MongoDB cloud. Changes saved locally only.'
+        });
+      }
     }
 
     if (req.method === 'GET') {
@@ -78,9 +109,48 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, message: 'All database records cleared.' });
       }
 
+      if (type === 'SYNC_ALL') {
+        const {
+          courses = [],
+          centres = [],
+          resourcePersons = [],
+          students = [],
+          enrollments = [],
+          classLogs = [],
+          remittances = [],
+          payouts = []
+        } = payload || {};
+
+        for (const c of courses) {
+          if (c.id) await Course.findOneAndUpdate({ id: c.id }, c, { upsert: true, new: true });
+        }
+        for (const c of centres) {
+          if (c.id) await Centre.findOneAndUpdate({ id: c.id }, c, { upsert: true, new: true });
+        }
+        for (const r of resourcePersons) {
+          if (r.id) await ResourcePerson.findOneAndUpdate({ id: r.id }, r, { upsert: true, new: true });
+        }
+        for (const s of students) {
+          if (s.account_phone) await StudentAccount.findOneAndUpdate({ account_phone: s.account_phone }, s, { upsert: true, new: true });
+        }
+        for (const e of enrollments) {
+          if (e.id) await Enrollment.findOneAndUpdate({ id: e.id }, e, { upsert: true, new: true });
+        }
+        for (const l of classLogs) {
+          if (l.id) await ClassLog.findOneAndUpdate({ id: l.id }, l, { upsert: true, new: true });
+        }
+        for (const rem of remittances) {
+          if (rem.id) await Remittance.findOneAndUpdate({ id: rem.id }, rem, { upsert: true, new: true });
+        }
+        for (const p of payouts) {
+          if (p.id) await Payout.findOneAndUpdate({ id: p.id }, p, { upsert: true, new: true });
+        }
+
+        return res.status(200).json({ success: true, message: 'All local records successfully synced to MongoDB Atlas.' });
+      }
 
       if (type === 'SYNC_ENTITY') {
-        const { entityName, item } = payload;
+        const { entityName, item } = payload || {};
         let Model;
         if (entityName === 'Course') Model = Course;
         if (entityName === 'Centre') Model = Centre;

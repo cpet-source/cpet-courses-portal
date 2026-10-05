@@ -5,6 +5,20 @@ import { CheckCircle, ArrowLeft, Building, Calendar, DollarSign, HelpCircle, Pho
 export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
   const { centres, lookupStudentByPhone, registerOrEnrollStudent, showToast } = useApp();
 
+  if (!course) {
+    return (
+      <div className="cpet-card" style={{ maxWidth: '680px', margin: '2rem auto', textAlign: 'center', padding: '2.5rem' }}>
+        <h3 style={{ color: 'var(--cpet-primary)', marginBottom: '0.5rem' }}>Course Details Loading...</h3>
+        <p style={{ color: '#64748b', fontSize: '0.88rem', marginBottom: '1.25rem' }}>
+          Please return to the catalog if this does not load shortly.
+        </p>
+        <button className="btn btn-secondary btn-sm" onClick={onBack}>
+          <ArrowLeft size={14} /> Back to Courses
+        </button>
+      </div>
+    );
+  }
+
   // Step 1: Phone check
   const [phone, setPhone] = useState('');
   const [hasCheckedPhone, setHasCheckedPhone] = useState(false);

@@ -283,18 +283,34 @@ export const CoursesManager = () => {
             </div>
 
             {/* Actions Footer */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid var(--cpet-border)', marginTop: '0.5rem' }}>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/?course=${course.slug}`);
-                  showToast('Public registration link copied to clipboard!');
-                }}
-                title="Copy Registration Link"
-              >
-                <Link size={14} />
-                <span>Share Link</span>
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid var(--cpet-border)', marginTop: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    const shareSlug = course.slug || course.course_code?.toLowerCase() || course.id;
+                    const url = `${window.location.origin}/?course=${shareSlug}`;
+                    navigator.clipboard.writeText(url);
+                    showToast('Direct registration link copied to clipboard!');
+                  }}
+                  title="Copy Registration Link"
+                >
+                  <Link size={14} />
+                  <span>Share Link</span>
+                </button>
+
+                <a
+                  href={`/?course=${course.slug || course.course_code?.toLowerCase() || course.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-secondary btn-sm"
+                  title="Open live public registration page in new tab"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                >
+                  <ExternalLink size={13} />
+                  <span>Test Link</span>
+                </a>
+              </div>
 
               <div style={{ display: 'flex', gap: '0.4rem' }}>
                 <button
