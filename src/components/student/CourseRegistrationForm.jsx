@@ -1,23 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { CheckCircle, ArrowLeft, Building, Calendar, DollarSign, HelpCircle, Phone, User } from 'lucide-react';
+import { CheckCircle, ArrowLeft, Building, Calendar, DollarSign, HelpCircle, Phone, User, Clock, AlertTriangle, AlertCircle } from 'lucide-react';
 
 export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
   const { centres, lookupStudentByPhone, registerOrEnrollStudent, showToast } = useApp();
-
-  if (!course) {
-    return (
-      <div className="cpet-card" style={{ maxWidth: '680px', margin: '2rem auto', textAlign: 'center', padding: '2.5rem' }}>
-        <h3 style={{ color: 'var(--cpet-primary)', marginBottom: '0.5rem' }}>Course Details Loading...</h3>
-        <p style={{ color: '#64748b', fontSize: '0.88rem', marginBottom: '1.25rem' }}>
-          Please return to the catalog if this does not load shortly.
-        </p>
-        <button className="btn btn-secondary btn-sm" onClick={onBack}>
-          <ArrowLeft size={14} /> Back to Courses
-        </button>
-      </div>
-    );
-  }
 
   // Step 1: Phone check
   const [phone, setPhone] = useState('');
@@ -36,9 +22,9 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
   });
 
   // Centre Selection (ONLY for Mahallu Courses)
-  const isMahallu = course.category === 'MAHALLU';
+  const isMahallu = course?.category === 'MAHALLU';
   const availableCentres = centres.filter(c => {
-    if (!isMahallu) return false;
+    if (!isMahallu || !course) return false;
     const isDirect = c.active_course_id === course.id;
     const inList = Array.isArray(c.course_ids) && c.course_ids.includes(course.id);
     return isDirect || inList;
@@ -56,6 +42,42 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
 
   // Payment details (if Pay at Registration)
   const [paymentUtr, setPaymentUtr] = useState('');
+
+  if (!course) {
+    return (
+      <div className="cpet-card" style={{ maxWidth: '680px', margin: '2rem auto', textAlign: 'center', padding: '2.5rem' }}>
+        <h3 style={{ color: 'var(--cpet-primary)', marginBottom: '0.5rem' }}>Course Details Loading...</h3>
+        <p style={{ color: '#64748b', fontSize: '0.88rem', marginBottom: '1.25rem' }}>
+          Please return to the catalog if this does not load shortly.
+        </p>
+        <button className="btn btn-secondary btn-sm" onClick={onBack}>
+          <ArrowLeft size={14} /> Back to Courses
+        </button>
+      </div>
+    );
+  }
+
+  // Deadline & Registration Status computation
+  const isClosed = course.registration_status === 'CLOSED';
+  const isUpcoming = course.registration_status === 'UPCOMING';
+
+  let daysRemaining = null;
+  let isDeadlinePassed = false;
+  if (course.registration_deadline) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const deadline = new Date(course.registration_deadline);
+    deadline.setHours(23, 59, 59, 999);
+    const diffTime = deadline.getTime() - today.getTime();
+    daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (daysRemaining < 0) {
+      isDeadlinePassed = true;
+    }
+  }
+
+  const isRegistrationBlocked = isClosed || isUpcoming || isDeadlinePassed;
+
+
 
   const handlePhoneLookup = (e) => {
     e.preventDefault();
@@ -153,6 +175,52 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
         </div>
       </div>
 
+      {/* Registration Timeline / Closed Banner */}
+      {isClosed && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <AlertCircle size={22} color="#dc2626" />
+          <div>
+            <strong style={{ color: '#991b1b', display: 'block', fontSize: '0.92rem' }}>Registration Closed</strong>
+            <span style={{ fontSize: '0.82rem', color: '#b91c1c' }}>
+              Admissions for this program are currently closed. Please check back for upcoming batches.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {isUpcoming && (
+        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <Clock size={22} color="#2563eb" />
+          <div>
+            <strong style={{ color: '#1e40af', display: 'block', fontSize: '0.92rem' }}>Registration Opening Soon</strong>
+            <span style={{ fontSize: '0.82rem', color: '#1d4ed8' }}>
+              Applications for this program will open soon. Please stay tuned!
+            </span>
+          </div>
+        </div>
+      )}
+
+      {!isClosed && !isUpcoming && isDeadlinePassed && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <AlertCircle size={22} color="#dc2626" />
+          <div>
+            <strong style={{ color: '#991b1b', display: 'block', fontSize: '0.92rem' }}>Application Deadline Passed</strong>
+            <span style={{ fontSize: '0.82rem', color: '#b91c1c' }}>
+              The registration deadline ({course.registration_deadline}) has ended.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {!isClosed && !isUpcoming && !isDeadlinePassed && daysRemaining !== null && (
+        <div style={{ background: daysRemaining <= 3 ? '#fffbeb' : '#f0fdf4', border: daysRemaining <= 3 ? '1px solid #fde68a' : '1px solid #bbf7d0', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <Clock size={18} color={daysRemaining <= 3 ? '#d97706' : '#16a34a'} />
+          <div style={{ fontSize: '0.85rem', color: daysRemaining <= 3 ? '#92400e' : '#166534', fontWeight: 600 }}>
+            {daysRemaining === 0 ? '🔥 Last day to apply! Registration closes tonight.' : `⏳ Only ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left to register! (Deadline: ${course.registration_deadline})`}
+          </div>
+        </div>
+      )}
+
       {/* Step 1: Mobile Phone Verification */}
       {!hasCheckedPhone ? (
         <form onSubmit={handlePhoneLookup}>
@@ -171,15 +239,21 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
                   type="tel"
                   className="form-input"
                   required
+                  disabled={isRegistrationBlocked}
                   placeholder="e.g. 9895112233"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                   style={{ fontSize: '1.05rem', fontWeight: 600 }}
                 />
-                <button type="submit" className="btn btn-primary">
+                <button type="submit" className="btn btn-primary" disabled={isRegistrationBlocked}>
                   Continue
                 </button>
               </div>
+              {isRegistrationBlocked && (
+                <span className="form-helper" style={{ color: '#dc2626' }}>
+                  Admissions for this program are currently closed.
+                </span>
+              )}
             </div>
           </div>
         </form>
@@ -504,7 +578,7 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
           <button
             type="submit"
             className="btn btn-primary btn-block"
-            disabled={isMahallu && availableCentres.length === 0}
+            disabled={isRegistrationBlocked || (isMahallu && availableCentres.length === 0)}
             style={{ fontSize: '1rem', padding: '0.85rem' }}
           >
             <CheckCircle size={18} /> Confirm Registration & Generate Admission No.

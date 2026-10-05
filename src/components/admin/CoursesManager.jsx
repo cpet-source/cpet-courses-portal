@@ -16,6 +16,8 @@ export const CoursesManager = () => {
     description: '',
     evaluation_type: 'EXAM_ONLY',
     payment_policy: 'COLLECTED_BY_RP',
+    registration_status: 'OPEN',
+    registration_deadline: '',
     min_attendance_percentage: 75,
     total_planned_classes: 24,
     standard_fee: 1500,
@@ -35,6 +37,8 @@ export const CoursesManager = () => {
       description: '',
       evaluation_type: 'EXAM_ONLY',
       payment_policy: 'COLLECTED_BY_RP',
+      registration_status: 'OPEN',
+      registration_deadline: '',
       min_attendance_percentage: 75,
       total_planned_classes: 24,
       standard_fee: 1500,
@@ -61,7 +65,9 @@ export const CoursesManager = () => {
       category: course.category || 'MAHALLU',
       description: course.description || '',
       evaluation_type: course.evaluation_type || 'EXAM_ONLY',
-      payment_policy: course.payment_policy || 'PAY_AT_REGISTRATION',
+      payment_policy: course.payment_policy || 'COLLECTED_BY_RP',
+      registration_status: course.registration_status || 'OPEN',
+      registration_deadline: course.registration_deadline || '',
       min_attendance_percentage: course.min_attendance_percentage || 75,
       total_planned_classes: course.total_planned_classes || 24,
       standard_fee: course.standard_fee || 0,
@@ -264,6 +270,18 @@ export const CoursesManager = () => {
 
               {/* Badges for dynamic features */}
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                {course.registration_status === 'CLOSED' ? (
+                  <span className="badge badge-danger">🔴 Registration Closed</span>
+                ) : course.registration_status === 'UPCOMING' ? (
+                  <span className="badge badge-accent">🟡 Opening Soon</span>
+                ) : (
+                  <span className="badge badge-success">🟢 Registration Open</span>
+                )}
+
+                {course.registration_deadline && (
+                  <span className="badge badge-warning">⏳ Deadline: {course.registration_deadline}</span>
+                )}
+
                 {course.subjects && course.subjects.length > 0 && (
                   <span className="badge badge-primary">
                     {course.subjects.length} Subjects / Exams
@@ -296,7 +314,7 @@ export const CoursesManager = () => {
                   title="Copy Registration Link"
                 >
                   <Link size={14} />
-                  <span>Share Link</span>
+                  <span>Share</span>
                 </button>
 
                 <a
@@ -312,7 +330,20 @@ export const CoursesManager = () => {
                 </a>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.4rem' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                <button
+                  className={`btn btn-sm ${course.registration_status === 'CLOSED' ? 'btn-success' : 'btn-outline'}`}
+                  style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
+                  onClick={() => {
+                    const newStatus = course.registration_status === 'CLOSED' ? 'OPEN' : 'CLOSED';
+                    updateCourse(course.id, { registration_status: newStatus });
+                    showToast(`Registration for "${course.title}" is now ${newStatus === 'CLOSED' ? 'CLOSED' : 'OPEN'}!`);
+                  }}
+                  title={course.registration_status === 'CLOSED' ? "Click to Re-Open Registration" : "Click to Close Registration"}
+                >
+                  {course.registration_status === 'CLOSED' ? 'Re-Open' : 'Close Intake'}
+                </button>
+
                 <button
                   className="btn btn-secondary btn-sm"
                   onClick={() => handleOpenEdit(course)}
@@ -467,6 +498,36 @@ export const CoursesManager = () => {
                       placeholder="CPET-{CODE}-26-{SEQ}"
                     />
                     <span className="form-helper">Tokens: {'{CODE}'} = Short Code, {'{SEQ}'} = Auto Sequence</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                      Registration Intake Status
+                    </label>
+                    <select
+                      className="form-select"
+                      value={formData.registration_status}
+                      onChange={e => setFormData({ ...formData, registration_status: e.target.value })}
+                      style={{ fontWeight: 700 }}
+                    >
+                      <option value="OPEN">🟢 Open for Registration</option>
+                      <option value="CLOSED">🔴 Registration Closed</option>
+                      <option value="UPCOMING">🟡 Announced / Opening Soon</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">
+                      Application Deadline Date (Optional)
+                    </label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={formData.registration_deadline}
+                      onChange={e => setFormData({ ...formData, registration_deadline: e.target.value })}
+                    />
+                    <span className="form-helper">Shows countdown (e.g. "3 days left") in public view</span>
                   </div>
                 </div>
 

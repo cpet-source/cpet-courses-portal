@@ -15,6 +15,8 @@ const CourseSchema = new mongoose.Schema({
   default_rp_remuneration_per_class: { type: Number, default: 800 },
   admission_no_pattern: { type: String, default: 'CPET-{CODE}-26-{SEQ}' },
   status: { type: String, default: 'ACTIVE' },
+  registration_status: { type: String, default: 'OPEN' }, // 'OPEN' | 'CLOSED' | 'UPCOMING'
+  registration_deadline: String, // 'YYYY-MM-DD'
   subjects: [mongoose.Schema.Types.Mixed],
   custom_questions: [mongoose.Schema.Types.Mixed]
 }, { timestamps: true });

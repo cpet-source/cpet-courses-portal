@@ -75,61 +75,111 @@ export const CourseCatalog = ({ onSelectCourse }) => {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
-          {filtered.map(course => (
-            <div key={course.id} className="cpet-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <span className={`badge ${
-                    course.category === 'MAHALLU' ? 'badge-primary' :
-                    course.category === 'GENERAL_ONLINE' ? 'badge-accent' : 'badge-warning'
-                  }`}>
-                    {course.category.replace('_', ' ')}
-                  </span>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--cpet-primary)' }}>
-                    {course.standard_fee > 0 ? `₹${course.standard_fee.toLocaleString('en-IN')}` : 'FREE'}
-                  </span>
+          {filtered.map(course => {
+            const isClosed = course.registration_status === 'CLOSED';
+            const isUpcoming = course.registration_status === 'UPCOMING';
+
+            let daysRemaining = null;
+            let isDeadlinePassed = false;
+            if (course.registration_deadline) {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const deadline = new Date(course.registration_deadline);
+              deadline.setHours(23, 59, 59, 999);
+              const diffTime = deadline.getTime() - today.getTime();
+              daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              if (daysRemaining < 0) {
+                isDeadlinePassed = true;
+              }
+            }
+            const isBlocked = isClosed || isUpcoming || isDeadlinePassed;
+
+            return (
+              <div key={course.id} className="cpet-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: isBlocked ? '1px solid #e2e8f0' : undefined }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.35rem' }}>
+                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                      <span className={`badge ${
+                        course.category === 'MAHALLU' ? 'badge-primary' :
+                        course.category === 'GENERAL_ONLINE' ? 'badge-accent' : 'badge-warning'
+                      }`}>
+                        {course.category.replace('_', ' ')}
+                      </span>
+
+                      {/* Status & Deadline Badges */}
+                      {isClosed && (
+                        <span className="badge badge-danger">Registration Closed</span>
+                      )}
+                      {isUpcoming && (
+                        <span className="badge badge-accent">Opening Soon</span>
+                      )}
+                      {!isClosed && !isUpcoming && isDeadlinePassed && (
+                        <span className="badge badge-danger">Deadline Ended</span>
+                      )}
+                      {!isClosed && !isUpcoming && !isDeadlinePassed && daysRemaining !== null && (
+                        <span className="badge" style={{ background: daysRemaining <= 3 ? '#fef3c7' : '#dcfce7', color: daysRemaining <= 3 ? '#92400e' : '#166534', fontWeight: 700 }}>
+                          ⏳ {daysRemaining === 0 ? 'Last Day!' : `${daysRemaining} days left`}
+                        </span>
+                      )}
+                    </div>
+
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--cpet-primary)' }}>
+                      {course.standard_fee > 0 ? `₹${course.standard_fee.toLocaleString('en-IN')}` : 'FREE'}
+                    </span>
+                  </div>
+
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: isBlocked ? '#475569' : 'var(--cpet-primary)', marginBottom: '0.4rem', lineHeight: 1.3 }}>
+                    {course.title}
+                  </h3>
+                  <p style={{ fontSize: '0.84rem', color: '#64748b', marginBottom: '1rem', lineHeight: 1.45 }}>
+                    {course.description}
+                  </p>
+
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.78rem', color: '#475569', marginBottom: '1rem', padding: '0.6rem 0.8rem', background: '#f8fafc', borderRadius: 'var(--radius-md)' }}>
+                    <span>📅 <strong>{course.total_planned_classes} Sessions</strong></span>
+                    <span>🎓 <strong>{course.evaluation_type.replace('_', ' ')}</strong></span>
+                    {course.payment_policy && (
+                      <span>💳 <strong>{course.payment_policy.replace(/_/g, ' ')}</strong></span>
+                    )}
+                  </div>
                 </div>
 
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--cpet-primary)', marginBottom: '0.4rem', lineHeight: 1.3 }}>
-                  {course.title}
-                </h3>
-                <p style={{ fontSize: '0.84rem', color: '#64748b', marginBottom: '1rem', lineHeight: 1.45 }}>
-                  {course.description}
-                </p>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      const shareUrl = `${window.location.origin}/?course=${course.slug || course.id}`;
+                      navigator.clipboard.writeText(shareUrl);
+                      showToast('Direct registration link copied to clipboard!');
+                    }}
+                    title="Share course registration link"
+                    style={{ padding: '0.6rem 0.85rem' }}
+                  >
+                    <Share2 size={16} />
+                  </button>
 
-                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.78rem', color: '#475569', marginBottom: '1rem', padding: '0.6rem 0.8rem', background: '#f8fafc', borderRadius: 'var(--radius-md)' }}>
-                  <span>📅 <strong>{course.total_planned_classes} Sessions</strong></span>
-                  <span>🎓 <strong>{course.evaluation_type.replace('_', ' ')}</strong></span>
-                  {course.payment_policy && (
-                    <span>💳 <strong>{course.payment_policy.replace(/_/g, ' ')}</strong></span>
+                  {isBlocked ? (
+                    <button
+                      className="btn btn-secondary"
+                      style={{ flex: 1, opacity: 0.7, cursor: 'not-allowed' }}
+                      disabled
+                    >
+                      {isClosed ? 'Registration Closed' : isUpcoming ? 'Opening Soon' : 'Deadline Passed'}
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-primary"
+                      style={{ flex: 1 }}
+                      onClick={() => onSelectCourse(course)}
+                    >
+                      <span>Register for this Course</span>
+                      <ArrowRight size={15} />
+                    </button>
                   )}
                 </div>
               </div>
-
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => {
-                    const shareUrl = `${window.location.origin}/?course=${course.slug || course.id}`;
-                    navigator.clipboard.writeText(shareUrl);
-                    showToast('Direct registration link copied to clipboard!');
-                  }}
-                  title="Share course registration link"
-                  style={{ padding: '0.6rem 0.85rem' }}
-                >
-                  <Share2 size={16} />
-                </button>
-                <button
-                  className="btn btn-primary"
-                  style={{ flex: 1 }}
-                  onClick={() => onSelectCourse(course)}
-                >
-                  <span>Register for this Course</span>
-                  <ArrowRight size={15} />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
