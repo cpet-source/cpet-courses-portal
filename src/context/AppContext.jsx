@@ -48,6 +48,7 @@ export const AppProvider = ({ children }) => {
   const [activeRole, setActiveRole] = useState(() => getStored(STORAGE_KEYS.ACTIVE_ROLE, 'admin'));
   // Currently simulated RP
   const [currentRpId, setCurrentRpId] = useState(() => getStored(STORAGE_KEYS.CURRENT_RP_ID, 'rp-1'));
+  const [isCloudConnected, setIsCloudConnected] = useState(false);
 
   // Notification Toast state
   const [toast, setToast] = useState(null);
@@ -58,6 +59,65 @@ export const AppProvider = ({ children }) => {
       setToast(null);
     }, 4000);
   };
+
+  // Helper to sync to MongoDB if cloud is active
+  const syncToCloud = (entityName, item) => {
+    try {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'SYNC_ENTITY',
+          payload: { entityName, item }
+        })
+      }).catch(() => {});
+    } catch (e) {}
+  };
+
+  // Check MongoDB connection on mount
+  useEffect(() => {
+    fetch('/api/data')
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.connected && res.data) {
+          setIsCloudConnected(true);
+          const d = res.data;
+          if (d.courses && d.courses.length > 0) setCourses(d.courses);
+          if (d.centres && d.centres.length > 0) setCentres(d.centres);
+          if (d.resourcePersons && d.resourcePersons.length > 0) setResourcePersons(d.resourcePersons);
+          if (d.students && d.students.length > 0) setStudents(d.students);
+          if (d.enrollments && d.enrollments.length > 0) setEnrollments(d.enrollments);
+          if (d.classLogs && d.classLogs.length > 0) setClassLogs(d.classLogs);
+          if (d.remittances && d.remittances.length > 0) setRemittances(d.remittances);
+          if (d.payouts && d.payouts.length > 0) setPayouts(d.payouts);
+
+          // Seed if empty
+          if (!d.courses || d.courses.length === 0) {
+            fetch('/api/data', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'SEED_INITIAL_DATA',
+                payload: {
+                  courses: initialCourses,
+                  centres: initialCentres,
+                  resourcePersons: initialResourcePersons,
+                  students: initialStudents,
+                  enrollments: initialEnrollments,
+                  classLogs: initialClassLogs,
+                  remittances: initialRemittances,
+                  payouts: initialPayouts
+                }
+              })
+            }).catch(() => {});
+          }
+        }
+      })
+      .catch(() => {
+        // Local mode
+      });
+  }, []);
+
 
   // Sync to local storage
   useEffect(() => {
@@ -125,12 +185,20 @@ export const AppProvider = ({ children }) => {
       status: 'ACTIVE'
     };
     setCourses(prev => [newCourse, ...prev]);
+    syncToCloud('Course', newCourse);
     showToast(`Course "${newCourse.title}" created successfully!`);
     return newCourse;
   };
 
   const updateCourse = (id, updatedFields) => {
-    setCourses(prev => prev.map(c => c.id === id ? { ...c, ...updatedFields } : c));
+    setCourses(prev => prev.map(c => {
+      if (c.id === id) {
+        const updated = { ...c, ...updatedFields };
+        syncToCloud('Course', updated);
+        return updated;
+      }
+      return c;
+    }));
     showToast('Course updated successfully!');
   };
 
@@ -144,6 +212,7 @@ export const AppProvider = ({ children }) => {
       status: activeRole === 'admin' ? 'ACTIVE' : 'PENDING_APPROVAL'
     };
     setCentres(prev => [newCentre, ...prev]);
+    syncToCloud('Centre', newCentre);
     showToast(
       activeRole === 'admin'
         ? `Study Centre "${newCentre.centre_name}" registered & activated!`
@@ -151,6 +220,7 @@ export const AppProvider = ({ children }) => {
     );
     return newCentre;
   };
+
 
   const updateCentreStatus = (centreId, newStatus) => {
     setCentres(prev => prev.map(c => c.id === centreId ? { ...c, status: newStatus } : c));
@@ -443,6 +513,7 @@ export const AppProvider = ({ children }) => {
         currentRp,
         currentRpId,
         setCurrentRpId,
+        isCloudConnected,
         toast,
         showToast,
         resetAllData,
