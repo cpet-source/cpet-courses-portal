@@ -7,7 +7,8 @@ import {
   Enrollment,
   ClassLog,
   Remittance,
-  Payout
+  Payout,
+  SystemMeta
 } from './models.js';
 
 export default async function handler(req, res) {
@@ -66,7 +67,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
-      const [courses, centres, rps, students, enrollments, classLogs, remittances, payouts] = await Promise.all([
+      const [courses, centres, rps, students, enrollments, classLogs, remittances, payouts, metaWipe] = await Promise.all([
         Course.find({}).lean(),
         Centre.find({}).lean(),
         ResourcePerson.find({}).lean(),
@@ -74,11 +75,13 @@ export default async function handler(req, res) {
         Enrollment.find({}).lean(),
         ClassLog.find({}).lean(),
         Remittance.find({}).lean(),
-        Payout.find({}).lean()
+        Payout.find({}).lean(),
+        SystemMeta.findOne({ key: 'last_wiped_at' }).lean()
       ]);
 
       return res.status(200).json({
         connected: true,
+        last_wiped_at: metaWipe?.value ? Number(metaWipe.value) : 0,
         data: {
           courses,
           centres,
@@ -106,7 +109,13 @@ export default async function handler(req, res) {
           Remittance.deleteMany({}),
           Payout.deleteMany({})
         ]);
-        return res.status(200).json({ success: true, message: 'All database records cleared.' });
+        const now = Date.now();
+        await SystemMeta.findOneAndUpdate(
+          { key: 'last_wiped_at' },
+          { key: 'last_wiped_at', value: now },
+          { upsert: true, new: true }
+        );
+        return res.status(200).json({ success: true, last_wiped_at: now, message: 'All database records cleared.' });
       }
 
       if (type === 'SYNC_ALL') {

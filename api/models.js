@@ -136,3 +136,11 @@ export const Enrollment = mongoose.models.Enrollment || mongoose.model('Enrollme
 export const ClassLog = mongoose.models.ClassLog || mongoose.model('ClassLog', ClassLogSchema);
 export const Remittance = mongoose.models.Remittance || mongoose.model('Remittance', RemittanceSchema);
 export const Payout = mongoose.models.Payout || mongoose.model('Payout', PayoutSchema);
+
+const SystemMetaSchema = new mongoose.Schema({
+  key: { type: String, unique: true, required: true },
+  value: mongoose.Schema.Types.Mixed
+}, { timestamps: true });
+
+export const SystemMeta = mongoose.models.SystemMeta || mongoose.model('SystemMeta', SystemMetaSchema);
+

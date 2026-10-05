@@ -43,6 +43,7 @@ export const AdminDashboard = () => {
   } = useApp();
   const [activeTab, setActiveTab] = useState('overview');
   const [showDbGuideModal, setShowDbGuideModal] = useState(false);
+  const [isWiping, setIsWiping] = useState(false);
 
   // Pending counts
   const pendingCentres = centres.filter(c => c.status === 'PENDING_APPROVAL');
@@ -315,13 +316,19 @@ export const AdminDashboard = () => {
             <button
               className="btn btn-secondary btn-sm"
               style={{ color: '#dc2626' }}
-              onClick={() => {
-                if (window.confirm('Are you sure you want to wipe all records from MongoDB and start completely fresh? This cannot be undone.')) {
-                  resetAllData();
+              disabled={isWiping}
+              onClick={async () => {
+                if (window.confirm('Are you sure you want to wipe all records from MongoDB and start completely fresh? This will delete all records across all devices and cannot be undone.')) {
+                  setIsWiping(true);
+                  try {
+                    await resetAllData();
+                  } finally {
+                    setIsWiping(false);
+                  }
                 }
               }}
             >
-              <RotateCcw size={14} /> Wipe All Test Records
+              <RotateCcw size={14} className={isWiping ? 'spin' : ''} /> {isWiping ? 'Wiping All Records...' : 'Wipe All Test Records'}
             </button>
           </div>
         </div>

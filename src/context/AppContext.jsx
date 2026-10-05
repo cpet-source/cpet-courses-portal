@@ -175,26 +175,56 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Helper to purge all local storage cached collections
+  const purgeAllLocalCollections = () => {
+    setCourses([]);
+    setCentres([]);
+    setResourcePersons([]);
+    setStudents([]);
+    setEnrollments([]);
+    setClassLogs([]);
+    setRemittances([]);
+    setPayouts([]);
+    Object.values(STORAGE_KEYS).forEach(k => {
+      try { localStorage.removeItem(k); } catch (e) {}
+    });
+  };
+
+  // Centralized method to apply cloud data and handle global wipes
+  const applyCloudData = (res) => {
+    if (!res || !res.connected || !res.data) return false;
+    setIsCloudConnected(true);
+    setCloudError(null);
+
+    const cloudWipedAt = Number(res.last_wiped_at || 0);
+    const localWipedAt = Number(localStorage.getItem('cpet_local_wiped_at') || 0);
+
+    // If cloud was wiped more recently than this client knew about, purge local storage
+    if (cloudWipedAt > 0 && cloudWipedAt > localWipedAt) {
+      localStorage.setItem('cpet_local_wiped_at', String(cloudWipedAt));
+      purgeAllLocalCollections();
+    }
+
+    const d = res.data;
+    // Cloud is the single source of truth - direct assignment (empty cloud = empty state)
+    setCourses(d.courses || []);
+    setCentres(d.centres || []);
+    setResourcePersons(d.resourcePersons || []);
+    setStudents(d.students || []);
+    setEnrollments(d.enrollments || []);
+    setClassLogs(d.classLogs || []);
+    setRemittances(d.remittances || []);
+    setPayouts(d.payouts || []);
+    return true;
+  };
+
   // Live sync from MongoDB Atlas
   const fetchLatestFromCloud = async () => {
     try {
       const r = await fetch('/api/data');
       const res = await r.json();
       if (res && res.connected && res.data) {
-        setIsCloudConnected(true);
-        setCloudError(null);
-        const d = res.data;
-
-        // Auto-merge or update from cloud
-        if (d.courses && d.courses.length > 0) setCourses(d.courses);
-        if (d.centres && d.centres.length > 0) setCentres(d.centres);
-        if (d.resourcePersons && d.resourcePersons.length > 0) setResourcePersons(d.resourcePersons);
-        if (d.students && d.students.length > 0) setStudents(d.students);
-        if (d.enrollments && d.enrollments.length > 0) setEnrollments(d.enrollments);
-        if (d.classLogs && d.classLogs.length > 0) setClassLogs(d.classLogs);
-        if (d.remittances && d.remittances.length > 0) setRemittances(d.remittances);
-        if (d.payouts && d.payouts.length > 0) setPayouts(d.payouts);
-        return true;
+        return applyCloudData(res);
       } else {
         if (res?.error) setCloudError(res.error);
         return false;
@@ -204,68 +234,14 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Check MongoDB connection on mount, auto-sync unsaved local records, and poll
+  // Check MongoDB connection on mount and poll
   useEffect(() => {
     const handleInitialSync = async () => {
       try {
         const r = await fetch('/api/data');
         const res = await r.json();
         if (res && res.connected && res.data) {
-          setIsCloudConnected(true);
-          setCloudError(null);
-          const d = res.data;
-
-          const localCourses = getStored(STORAGE_KEYS.COURSES, []);
-          const localCentres = getStored(STORAGE_KEYS.CENTRES, []);
-          const localStudents = getStored(STORAGE_KEYS.STUDENTS, []);
-          const localEnrollments = getStored(STORAGE_KEYS.ENROLLMENTS, []);
-
-          // If this browser has student/enrollment records not yet in cloud, auto-sync them up!
-          const hasLocalUnsynced =
-            (localStudents.length > (d.students?.length || 0)) ||
-            (localEnrollments.length > (d.enrollments?.length || 0)) ||
-            (localCentres.length > (d.centres?.length || 0)) ||
-            (localCourses.length > (d.courses?.length || 0));
-
-          if (hasLocalUnsynced) {
-            // Push any local items missing from cloud
-            await fetch('/api/data', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'SYNC_ALL',
-                payload: {
-                  courses: d.courses?.length > 0 ? d.courses : localCourses,
-                  centres: d.centres?.length > 0 ? d.centres : localCentres,
-                  resourcePersons: d.resourcePersons || [],
-                  students: localStudents.length > 0 ? localStudents : d.students,
-                  enrollments: localEnrollments.length > 0 ? localEnrollments : d.enrollments,
-                  classLogs: d.classLogs || [],
-                  remittances: d.remittances || [],
-                  payouts: d.payouts || []
-                }
-              })
-            });
-
-            // Re-fetch unified data
-            const r2 = await fetch('/api/data');
-            const res2 = await r2.json();
-            if (res2?.data) {
-              if (res2.data.courses) setCourses(res2.data.courses);
-              if (res2.data.centres) setCentres(res2.data.centres);
-              if (res2.data.students) setStudents(res2.data.students);
-              if (res2.data.enrollments) setEnrollments(res2.data.enrollments);
-            }
-          } else {
-            if (d.courses && d.courses.length > 0) setCourses(d.courses);
-            if (d.centres && d.centres.length > 0) setCentres(d.centres);
-            if (d.resourcePersons && d.resourcePersons.length > 0) setResourcePersons(d.resourcePersons);
-            if (d.students && d.students.length > 0) setStudents(d.students);
-            if (d.enrollments && d.enrollments.length > 0) setEnrollments(d.enrollments);
-            if (d.classLogs && d.classLogs.length > 0) setClassLogs(d.classLogs);
-            if (d.remittances && d.remittances.length > 0) setRemittances(d.remittances);
-            if (d.payouts && d.payouts.length > 0) setPayouts(d.payouts);
-          }
+          applyCloudData(res);
         } else {
           setIsCloudConnected(false);
           if (res?.error) setCloudError(res.error);
@@ -282,7 +258,7 @@ export const AppProvider = ({ children }) => {
     const onFocus = () => fetchLatestFromCloud();
     window.addEventListener('focus', onFocus);
 
-    // Auto-refresh every 12 seconds to pick up student registrations from other devices
+    // Auto-refresh every 12 seconds to pick up updates from other devices
     const interval = setInterval(fetchLatestFromCloud, 12000);
 
     return () => {
@@ -340,23 +316,24 @@ export const AppProvider = ({ children }) => {
 
   // Reset / Clear all data
   const resetAllData = async () => {
-    setCourses([]);
-    setCentres([]);
-    setResourcePersons([]);
-    setStudents([]);
-    setEnrollments([]);
-    setClassLogs([]);
-    setRemittances([]);
-    setPayouts([]);
-    localStorage.clear();
+    const now = Date.now();
+    localStorage.setItem('cpet_local_wiped_at', String(now));
+    purgeAllLocalCollections();
+
     try {
-      await fetch('/api/data', {
+      const res = await fetch('/api/data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'CLEAR_ALL_DATA' })
       });
-    } catch (e) {}
-    showToast('Database wiped clean. Ready for real data.', 'info');
+      const data = await res.json();
+      if (data?.last_wiped_at) {
+        localStorage.setItem('cpet_local_wiped_at', String(data.last_wiped_at));
+      }
+    } catch (e) {
+      console.error('Failed to wipe database in cloud:', e);
+    }
+    showToast('Database completely wiped clean across all devices.', 'info');
   };
 
   // 1. Course Management
