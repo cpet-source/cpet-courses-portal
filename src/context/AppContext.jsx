@@ -1,0 +1,473 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import {
+  initialCourses,
+  initialCentres,
+  initialResourcePersons,
+  initialStudents,
+  initialEnrollments,
+  initialClassLogs,
+  initialRemittances,
+  initialPayouts
+} from '../data/mockData';
+
+const AppContext = createContext();
+
+const STORAGE_KEYS = {
+  COURSES: 'cpet_courses_v1',
+  CENTRES: 'cpet_centres_v1',
+  RPS: 'cpet_rps_v1',
+  STUDENTS: 'cpet_students_v1',
+  ENROLLMENTS: 'cpet_enrollments_v1',
+  CLASS_LOGS: 'cpet_class_logs_v1',
+  REMITTANCES: 'cpet_remittances_v1',
+  PAYOUTS: 'cpet_payouts_v1',
+  ACTIVE_ROLE: 'cpet_active_role_v1',
+  CURRENT_RP_ID: 'cpet_current_rp_id_v1'
+};
+
+const getStored = (key, fallback) => {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : fallback;
+  } catch (e) {
+    return fallback;
+  }
+};
+
+export const AppProvider = ({ children }) => {
+  const [courses, setCourses] = useState(() => getStored(STORAGE_KEYS.COURSES, initialCourses));
+  const [centres, setCentres] = useState(() => getStored(STORAGE_KEYS.CENTRES, initialCentres));
+  const [resourcePersons, setResourcePersons] = useState(() => getStored(STORAGE_KEYS.RPS, initialResourcePersons));
+  const [students, setStudents] = useState(() => getStored(STORAGE_KEYS.STUDENTS, initialStudents));
+  const [enrollments, setEnrollments] = useState(() => getStored(STORAGE_KEYS.ENROLLMENTS, initialEnrollments));
+  const [classLogs, setClassLogs] = useState(() => getStored(STORAGE_KEYS.CLASS_LOGS, initialClassLogs));
+  const [remittances, setRemittances] = useState(() => getStored(STORAGE_KEYS.REMITTANCES, initialRemittances));
+  const [payouts, setPayouts] = useState(() => getStored(STORAGE_KEYS.PAYOUTS, initialPayouts));
+  
+  // Active view role: 'admin' | 'rp' | 'student'
+  const [activeRole, setActiveRole] = useState(() => getStored(STORAGE_KEYS.ACTIVE_ROLE, 'admin'));
+  // Currently simulated RP
+  const [currentRpId, setCurrentRpId] = useState(() => getStored(STORAGE_KEYS.CURRENT_RP_ID, 'rp-1'));
+
+  // Notification Toast state
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type, id: Date.now() });
+    setTimeout(() => {
+      setToast(null);
+    }, 4000);
+  };
+
+  // Sync to local storage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(courses));
+  }, [courses]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CENTRES, JSON.stringify(centres));
+  }, [centres]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.RPS, JSON.stringify(resourcePersons));
+  }, [resourcePersons]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
+  }, [students]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.ENROLLMENTS, JSON.stringify(enrollments));
+  }, [enrollments]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CLASS_LOGS, JSON.stringify(classLogs));
+  }, [classLogs]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.REMITTANCES, JSON.stringify(remittances));
+  }, [remittances]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.PAYOUTS, JSON.stringify(payouts));
+  }, [payouts]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_ROLE, JSON.stringify(activeRole));
+  }, [activeRole]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CURRENT_RP_ID, JSON.stringify(currentRpId));
+  }, [currentRpId]);
+
+  // Current active RP object
+  const currentRp = resourcePersons.find(rp => rp.id === currentRpId) || resourcePersons[0];
+
+  // Reset to seed data
+  const resetAllData = () => {
+    setCourses(initialCourses);
+    setCentres(initialCentres);
+    setResourcePersons(initialResourcePersons);
+    setStudents(initialStudents);
+    setEnrollments(initialEnrollments);
+    setClassLogs(initialClassLogs);
+    setRemittances(initialRemittances);
+    setPayouts(initialPayouts);
+    localStorage.clear();
+    showToast('All CPET Portal data reset to defaults.', 'info');
+  };
+
+  // 1. Course Management
+  const addCourse = (courseData) => {
+    const newCourse = {
+      ...courseData,
+      id: `crs-${Date.now()}`,
+      status: 'ACTIVE'
+    };
+    setCourses(prev => [newCourse, ...prev]);
+    showToast(`Course "${newCourse.title}" created successfully!`);
+    return newCourse;
+  };
+
+  const updateCourse = (id, updatedFields) => {
+    setCourses(prev => prev.map(c => c.id === id ? { ...c, ...updatedFields } : c));
+    showToast('Course updated successfully!');
+  };
+
+  // 2. Study Centre Management
+  const addCentre = (centreData) => {
+    const newCode = `MHL-${(centreData.district || 'KRL').substring(0, 3).toUpperCase()}-${String(centres.length + 1).padStart(3, '0')}`;
+    const newCentre = {
+      ...centreData,
+      id: `ctr-${Date.now()}`,
+      centre_code: newCode,
+      status: activeRole === 'admin' ? 'ACTIVE' : 'PENDING_APPROVAL'
+    };
+    setCentres(prev => [newCentre, ...prev]);
+    showToast(
+      activeRole === 'admin'
+        ? `Study Centre "${newCentre.centre_name}" registered & activated!`
+        : `New Study Centre registered! Sent to CPET Office for approval.`
+    );
+    return newCentre;
+  };
+
+  const updateCentreStatus = (centreId, newStatus) => {
+    setCentres(prev => prev.map(c => c.id === centreId ? { ...c, status: newStatus } : c));
+    showToast(`Centre status updated to ${newStatus}.`);
+  };
+
+  const assignRpToCentre = (centreId, rpId, activeCourseId) => {
+    setCentres(prev => prev.map(c => {
+      if (c.id === centreId) {
+        return {
+          ...c,
+          assigned_rp_id: rpId,
+          active_course_id: activeCourseId || c.active_course_id
+        };
+      }
+      return c;
+    }));
+    showToast('Resource Person assigned to Centre.');
+  };
+
+  // 3. Resource Person Management
+  const addResourcePerson = (rpData) => {
+    const newRp = {
+      ...rpData,
+      id: `rp-${Date.now()}`,
+      status: 'ACTIVE'
+    };
+    setResourcePersons(prev => [...prev, newRp]);
+    showToast(`Resource Person "${newRp.full_name}" onboarded!`);
+    return newRp;
+  };
+
+  // 4. Student Account & Enrollment Engine (Universal Phone)
+  const lookupStudentByPhone = (rawPhone) => {
+    const cleanPhone = (rawPhone || '').trim().replace(/\D/g, '').slice(-10);
+    return students.find(s => s.account_phone === cleanPhone);
+  };
+
+  const registerOrEnrollStudent = ({
+    phone,
+    whatsappNumber,
+    existingMemberId,
+    newMemberData,
+    courseId,
+    centreId,
+    customResponses = {},
+    feeStatus = 'PENDING',
+    amountPaid = 0
+  }) => {
+    const cleanPhone = (phone || '').trim().replace(/\D/g, '').slice(-10);
+    const targetCourse = courses.find(c => c.id === courseId);
+    const targetCentre = centres.find(c => c.id === centreId);
+
+    let activeProfileId = existingMemberId;
+    let activeProfileName = '';
+
+    // Handle Student Account / Profiles
+    setStudents(prev => {
+      const existingAccount = prev.find(a => a.account_phone === cleanPhone);
+      if (existingAccount) {
+        if (existingMemberId) {
+          const profile = existingAccount.members.find(m => m.id === existingMemberId);
+          if (profile) activeProfileName = profile.full_name;
+          return prev;
+        } else {
+          // Add new family member under this phone
+          const newProfile = {
+            id: `prof-${Date.now()}`,
+            full_name: newMemberData.full_name,
+            gender: newMemberData.gender || 'MALE',
+            date_of_birth: newMemberData.date_of_birth || '',
+            relationship: newMemberData.relationship || 'Member',
+            place: newMemberData.place || (targetCentre ? targetCentre.place : ''),
+            district: newMemberData.district || (targetCentre ? targetCentre.district : '')
+          };
+          activeProfileId = newProfile.id;
+          activeProfileName = newProfile.full_name;
+
+          return prev.map(a => a.account_phone === cleanPhone ? {
+            ...a,
+            members: [...a.members, newProfile]
+          } : a);
+        }
+      } else {
+        // Create brand new account with initial member
+        const newProfile = {
+          id: `prof-${Date.now()}`,
+          full_name: newMemberData.full_name,
+          gender: newMemberData.gender || 'MALE',
+          date_of_birth: newMemberData.date_of_birth || '',
+          relationship: newMemberData.relationship || 'Self',
+          place: newMemberData.place || (targetCentre ? targetCentre.place : ''),
+          district: newMemberData.district || (targetCentre ? targetCentre.district : '')
+        };
+        activeProfileId = newProfile.id;
+        activeProfileName = newProfile.full_name;
+
+        const newAccount = {
+          account_phone: cleanPhone,
+          whatsapp_number: whatsappNumber || cleanPhone,
+          members: [newProfile]
+        };
+        return [...prev, newAccount];
+      }
+    });
+
+    // Generate Admission Number
+    const seq = String(enrollments.filter(e => e.course_id === courseId).length + 1).padStart(4, '0');
+    const pattern = targetCourse?.admission_no_pattern || 'CPET-{CODE}-26-{SEQ}';
+    const admissionNumber = pattern
+      .replace('{CODE}', targetCourse?.course_code || 'GEN')
+      .replace('{SEQ}', seq);
+
+    const newEnrollment = {
+      id: `enr-${Date.now()}`,
+      account_phone: cleanPhone,
+      student_profile_id: activeProfileId,
+      student_name: activeProfileName || newMemberData?.full_name || 'Student',
+      course_id: courseId,
+      course_title: targetCourse?.title || 'Course',
+      centre_id: centreId || null,
+      centre_name: targetCentre ? targetCentre.centre_name : (targetCourse?.category === 'GENERAL_ONLINE' ? 'Online Session' : 'CPET Main Campus'),
+      admission_number: admissionNumber,
+      enrollment_date: new Date().toISOString().split('T')[0],
+      fee_status: feeStatus,
+      amount_paid: amountPaid,
+      completion_status: 'IN_PROGRESS',
+      classes_attended: 0,
+      marks: {},
+      custom_responses: customResponses
+    };
+
+    setEnrollments(prev => [newEnrollment, ...prev]);
+    showToast(`Admission confirmed! Admission No: ${admissionNumber}`);
+    return newEnrollment;
+  };
+
+  // 5. Class Log Engine (RP & Remuneration)
+  const addClassLog = (logData) => {
+    const targetCourse = courses.find(c => c.id === logData.course_id);
+    const targetCentre = centres.find(c => c.id === logData.centre_id);
+    const standardRate = logData.standard_rate || targetCourse?.default_rp_remuneration_per_class || 800;
+    const travelAllowance = Number(logData.travel_allowance || 0);
+
+    const newLog = {
+      id: `log-${Date.now()}`,
+      rp_id: currentRp.id,
+      rp_name: currentRp.full_name,
+      centre_id: logData.centre_id,
+      centre_name: targetCentre ? targetCentre.centre_name : 'Centre',
+      course_id: logData.course_id,
+      course_title: targetCourse ? targetCourse.title : 'Course',
+      class_date: logData.class_date,
+      session_type: logData.session_type || 'REGULAR_CLASS',
+      hours_spent: Number(logData.hours_spent || 2.0),
+      syllabus_covered: logData.syllabus_covered,
+      standard_rate: standardRate,
+      travel_allowance: travelAllowance,
+      total_claim: standardRate + travelAllowance,
+      status: 'SUBMITTED',
+      admin_notes: ''
+    };
+
+    setClassLogs(prev => [newLog, ...prev]);
+    showToast('Class log submitted successfully to CPET Office!');
+    return newLog;
+  };
+
+  const verifyClassLog = (logId, approvedAmount, adminNotes) => {
+    setClassLogs(prev => prev.map(log => {
+      if (log.id === logId) {
+        return {
+          ...log,
+          total_claim: approvedAmount !== undefined ? approvedAmount : log.total_claim,
+          status: 'VERIFIED_BY_ADMIN',
+          admin_notes: adminNotes || 'Approved by CPET Super Admin'
+        };
+      }
+      return log;
+    }));
+    showToast('Class log verified and approved for remuneration payout.');
+  };
+
+  // 6. Fee Remittance to Office
+  const addRemittance = (remData) => {
+    const targetCentre = centres.find(c => c.id === remData.centre_id);
+    const newRem = {
+      id: `rem-${Date.now()}`,
+      rp_id: currentRp.id,
+      rp_name: currentRp.full_name,
+      centre_id: remData.centre_id,
+      centre_name: targetCentre ? targetCentre.centre_name : 'Centre',
+      amount: Number(remData.amount),
+      payment_mode: remData.payment_mode || 'BANK_TRANSFER',
+      transaction_ref: remData.transaction_ref,
+      remittance_date: remData.remittance_date || new Date().toISOString().split('T')[0],
+      status: 'PENDING_VERIFICATION',
+      student_count: Number(remData.student_count || 0),
+      notes: remData.notes || ''
+    };
+
+    setRemittances(prev => [newRem, ...prev]);
+    showToast('Fee remittance submitted to CPET Office for confirmation!');
+    return newRem;
+  };
+
+  const confirmRemittance = (remittanceId) => {
+    setRemittances(prev => prev.map(r => r.id === remittanceId ? { ...r, status: 'CONFIRMED_BY_OFFICE' } : r));
+    showToast('Remittance confirmed! Ledger updated.');
+  };
+
+  // 7. Remuneration Disbursal
+  const disbursePayout = (payoutData) => {
+    const newPayout = {
+      id: `pay-${Date.now()}`,
+      ...payoutData,
+      disbursed_at: new Date().toISOString().split('T')[0],
+      status: 'DISBURSED'
+    };
+
+    setPayouts(prev => [newPayout, ...prev]);
+    // Also mark associated logs as paid
+    setClassLogs(prev => prev.map(l => {
+      if (l.rp_id === payoutData.rp_id && l.status === 'VERIFIED_BY_ADMIN') {
+        return { ...l, status: 'PAYMENT_PROCESSED' };
+      }
+      return l;
+    }));
+
+    showToast(`Remuneration of ₹${payoutData.final_payout_amount} disbursed to ${payoutData.rp_name}!`);
+  };
+
+  // 8. Academic Mark Entry & Attendance
+  const updateStudentMarks = (enrollmentId, subjectId, marks) => {
+    setEnrollments(prev => prev.map(enr => {
+      if (enr.id === enrollmentId) {
+        return {
+          ...enr,
+          marks: {
+            ...enr.marks,
+            [subjectId]: Number(marks)
+          }
+        };
+      }
+      return enr;
+    }));
+    showToast('Marks updated successfully.');
+  };
+
+  const updateStudentFee = (enrollmentId, feeStatus, amountPaid) => {
+    setEnrollments(prev => prev.map(enr => {
+      if (enr.id === enrollmentId) {
+        return {
+          ...enr,
+          fee_status: feeStatus,
+          amount_paid: amountPaid !== undefined ? Number(amountPaid) : enr.amount_paid
+        };
+      }
+      return enr;
+    }));
+    showToast('Student fee record updated.');
+  };
+
+  const markStudentAttendance = (enrollmentId) => {
+    setEnrollments(prev => prev.map(enr => {
+      if (enr.id === enrollmentId) {
+        return {
+          ...enr,
+          classes_attended: (enr.classes_attended || 0) + 1
+        };
+      }
+      return enr;
+    }));
+    showToast('Attendance recorded.');
+  };
+
+  return (
+    <AppContext.Provider
+      value={{
+        courses,
+        centres,
+        resourcePersons,
+        students,
+        enrollments,
+        classLogs,
+        remittances,
+        payouts,
+        activeRole,
+        setActiveRole,
+        currentRp,
+        currentRpId,
+        setCurrentRpId,
+        toast,
+        showToast,
+        resetAllData,
+        // Methods
+        addCourse,
+        updateCourse,
+        addCentre,
+        updateCentreStatus,
+        assignRpToCentre,
+        addResourcePerson,
+        lookupStudentByPhone,
+        registerOrEnrollStudent,
+        addClassLog,
+        verifyClassLog,
+        addRemittance,
+        confirmRemittance,
+        disbursePayout,
+        updateStudentMarks,
+        updateStudentFee,
+        markStudentAttendance
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => useContext(AppContext);
