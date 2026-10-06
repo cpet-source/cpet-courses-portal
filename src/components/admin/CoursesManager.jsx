@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download } from 'lucide-react';
 
 export const CoursesManager = () => {
-  const { courses, addCourse, updateCourse, showToast, setActiveRole } = useApp();
+  const { courses, enrollments, addCourse, updateCourse, showToast, setActiveRole } = useApp();
   const [filterCategory, setFilterCategory] = useState('ALL');
   const [showModal, setShowModal] = useState(false);
   const [editingCourseId, setEditingCourseId] = useState(null);
@@ -175,6 +175,69 @@ export const CoursesManager = () => {
     return true;
   });
 
+  const handleExportCSV = () => {
+    if (filteredCourses.length === 0) {
+      showToast('No courses to export', 'warning');
+      return;
+    }
+
+    const headers = [
+      'Course Code',
+      'Course Title',
+      'Category',
+      'Registration Status',
+      'Registration Deadline',
+      'Total Planned Classes',
+      'Evaluation Type',
+      'Payment Policy',
+      'Student Fee (INR)',
+      'RP Wage Per Class (INR)',
+      'Min Attendance (%)',
+      'Subjects Count',
+      'Subjects List',
+      'Intake Questions Count',
+      'Enrolled Students',
+      'Description'
+    ];
+
+    const rows = filteredCourses.map(c => {
+      const enrolledCount = (enrollments || []).filter(e => e.course_id === c.id).length;
+      const subjectsList = (c.subjects || []).map(s => `${s.name} (${s.code || ''})`).join('; ');
+
+      return [
+        `"${c.course_code || ''}"`,
+        `"${(c.title || '').replace(/"/g, '""')}"`,
+        `"${c.category || ''}"`,
+        `"${c.registration_status || 'OPEN'}"`,
+        `"${c.registration_deadline || 'No deadline'}"`,
+        c.total_planned_classes || 0,
+        `"${c.evaluation_type || ''}"`,
+        `"${c.payment_policy || ''}"`,
+        c.standard_fee || 0,
+        c.default_rp_remuneration_per_class || 0,
+        c.min_attendance_percentage || 75,
+        (c.subjects || []).length,
+        `"${subjectsList.replace(/"/g, '""')}"`,
+        (c.custom_questions || []).length,
+        enrolledCount,
+        `"${(c.description || '').replace(/"/g, '""')}"`
+      ];
+    });
+
+    const csvString = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `CPET_Courses_Master_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast('Exported courses list to Excel (CSV)!');
+  };
+
   return (
     <div>
       <div className="cpet-card-header">
@@ -187,10 +250,16 @@ export const CoursesManager = () => {
             Define Mahallu study programs, online diplomas, and workshops with custom dynamic intake questionnaires ("Google Form Killer").
           </p>
         </div>
-        <button className="btn btn-primary" onClick={handleOpenCreate}>
-          <Plus size={18} />
-          Create New Course
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" onClick={handleExportCSV}>
+            <Download size={16} />
+            Export to Excel (CSV)
+          </button>
+          <button className="btn btn-primary" onClick={handleOpenCreate}>
+            <Plus size={18} />
+            Create New Course
+          </button>
+        </div>
       </div>
 
       {/* Filter Tabs */}

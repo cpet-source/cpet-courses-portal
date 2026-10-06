@@ -106,6 +106,8 @@ const RemittanceSchema = new mongoose.Schema({
   rp_name: String,
   centre_id: { type: String, required: true },
   centre_name: String,
+  course_id: String,
+  course_title: String,
   amount: { type: Number, required: true },
   payment_mode: String,
   transaction_ref: String,

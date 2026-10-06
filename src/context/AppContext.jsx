@@ -693,12 +693,18 @@ export const AppProvider = ({ children }) => {
   // 6. Fee Remittance to Office
   const addRemittance = (remData) => {
     const targetCentre = centres.find(c => c.id === remData.centre_id);
+    const targetCourse = courses.find(c => c.id === remData.course_id);
+    const resolvedCourseId = remData.course_id || targetCentre?.active_course_id || (targetCentre?.course_ids && targetCentre.course_ids[0]) || '';
+    const resolvedCourseTitle = targetCourse ? targetCourse.title : (courses.find(c => c.id === resolvedCourseId)?.title || '');
+
     const newRem = {
       id: `rem-${Date.now()}`,
-      rp_id: currentRp.id,
-      rp_name: currentRp.full_name,
+      rp_id: currentRp?.id || 'RP-01',
+      rp_name: currentRp?.full_name || 'Faculty RP',
       centre_id: remData.centre_id,
       centre_name: targetCentre ? targetCentre.centre_name : 'Centre',
+      course_id: resolvedCourseId,
+      course_title: resolvedCourseTitle,
       amount: Number(remData.amount),
       payment_mode: remData.payment_mode || 'BANK_TRANSFER',
       transaction_ref: remData.transaction_ref,
@@ -724,6 +730,12 @@ export const AppProvider = ({ children }) => {
       return r;
     }));
     showToast('Remittance confirmed! Ledger updated.');
+  };
+
+  const deleteRemittance = (remittanceId) => {
+    setRemittances(prev => prev.filter(r => r.id !== remittanceId));
+    deleteFromCloud('Remittance', remittanceId);
+    showToast('Fee remittance record deleted', 'info');
   };
 
   // 7. Remuneration Disbursal
@@ -892,6 +904,7 @@ export const AppProvider = ({ children }) => {
         verifyClassLog,
         addRemittance,
         confirmRemittance,
+        deleteRemittance,
         disbursePayout,
         updateStudentMarks,
         updateStudentFee,

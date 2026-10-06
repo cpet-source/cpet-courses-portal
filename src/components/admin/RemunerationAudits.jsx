@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { CheckCircle, Clock, DollarSign, UserCheck, AlertCircle, FileText, Send, Trash2 } from 'lucide-react';
+import { CheckCircle, Clock, DollarSign, UserCheck, AlertCircle, FileText, Send, Trash2, Download } from 'lucide-react';
 
 export const RemunerationAudits = () => {
-  const { classLogs, resourcePersons, verifyClassLog, deleteClassLog, disbursePayout, payouts, showToast } = useApp();
+  const { classLogs, resourcePersons, centres, verifyClassLog, deleteClassLog, disbursePayout, payouts, showToast } = useApp();
   const [filterRp, setFilterRp] = useState('ALL');
+  const [filterCentre, setFilterCentre] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [showPayoutModal, setShowPayoutModal] = useState(false);
   const [selectedRpForPayout, setSelectedRpForPayout] = useState(null);
@@ -24,6 +25,7 @@ export const RemunerationAudits = () => {
   const filteredLogs = classLogs
     .filter(log => {
       if (filterRp !== 'ALL' && log.rp_id !== filterRp) return false;
+      if (filterCentre !== 'ALL' && log.centre_id !== filterCentre) return false;
       if (filterStatus !== 'ALL' && log.status !== filterStatus) return false;
       return true;
     })
@@ -31,6 +33,58 @@ export const RemunerationAudits = () => {
       if (b.class_date !== a.class_date) return (b.class_date || '').localeCompare(a.class_date || '');
       return (b.id || '').localeCompare(a.id || '');
     });
+
+  const handleExportCSV = () => {
+    if (filteredLogs.length === 0) {
+      showToast('No class logs to export', 'warning');
+      return;
+    }
+
+    const headers = [
+      'Log ID',
+      'Class Date',
+      'Resource Person',
+      'Study Centre',
+      'Course Title',
+      'Session Type',
+      'Hours Spent',
+      'Syllabus Covered',
+      'Class Fee (INR)',
+      'Travel Allowance (INR)',
+      'Total Claim (INR)',
+      'Status',
+      'Office Notes'
+    ];
+
+    const rows = filteredLogs.map(log => [
+      `"${log.id || ''}"`,
+      `"${log.class_date || ''}"`,
+      `"${(log.rp_name || '').replace(/"/g, '""')}"`,
+      `"${(log.centre_name || '').replace(/"/g, '""')}"`,
+      `"${(log.course_title || '').replace(/"/g, '""')}"`,
+      `"${log.session_type || ''}"`,
+      log.hours_spent || 0,
+      `"${(log.syllabus_covered || '').replace(/"/g, '""')}"`,
+      log.standard_rate || 0,
+      log.travel_allowance || 0,
+      log.total_claim || 0,
+      `"${log.status || ''}"`,
+      `"${(log.admin_notes || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvString = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `CPET_RP_Class_Logs_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast('Exported RP class logs & wages to Excel (CSV)!');
+  };
 
   const handleStartVerify = (log) => {
     setVerifyingLogId(log.id);
@@ -105,6 +159,10 @@ export const RemunerationAudits = () => {
             Review teacher class logs (replacing WhatsApp group messages), audit travel allowances, and disburse verified remuneration.
           </p>
         </div>
+        <button className="btn btn-secondary" onClick={handleExportCSV}>
+          <Download size={16} />
+          Export to Excel (CSV)
+        </button>
       </div>
 
       {/* RP Payout Summary Cards */}
@@ -153,6 +211,18 @@ export const RemunerationAudits = () => {
           <option value="ALL">All Resource Persons</option>
           {resourcePersons.map(r => (
             <option key={r.id} value={r.id}>{r.full_name}</option>
+          ))}
+        </select>
+
+        <select
+          className="form-select"
+          style={{ width: 'auto', fontSize: '0.85rem' }}
+          value={filterCentre}
+          onChange={e => setFilterCentre(e.target.value)}
+        >
+          <option value="ALL">All Study Centres</option>
+          {centres.map(c => (
+            <option key={c.id} value={c.id}>{c.centre_name} ({c.place})</option>
           ))}
         </select>
 

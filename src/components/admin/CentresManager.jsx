@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { MapPin, Phone, UserCheck, Plus, CheckCircle, Clock, Building, User, Edit2, Trash2 } from 'lucide-react';
+import { MapPin, Phone, UserCheck, Plus, CheckCircle, Clock, Building, User, Edit2, Trash2, Download } from 'lucide-react';
 import { KERALA_DISTRICTS } from '../../data/districts';
 
 export const CentresManager = () => {
@@ -103,6 +103,74 @@ export const CentresManager = () => {
     return true;
   });
 
+  const handleExportCSV = () => {
+    if (filteredCentres.length === 0) {
+      showToast('No centres to export', 'warning');
+      return;
+    }
+
+    const headers = [
+      'Centre Code',
+      'Centre Name',
+      'Place',
+      'Mahallu Name',
+      'Panchayath / Municipality',
+      'District',
+      'Pincode',
+      'Status',
+      'Assigned Resource Person',
+      'Course Coordinator Name',
+      'Course Coordinator Phone',
+      'President Name',
+      'President Phone',
+      'Secretary Name',
+      'Secretary Phone',
+      'Enrolled Students Count',
+      'Running Courses'
+    ];
+
+    const rows = filteredCentres.map(c => {
+      const studentCount = enrollments.filter(e => e.centre_id === c.id).length;
+      const assignedRp = resourcePersons.find(r => r.id === c.assigned_rp_id);
+      const centreCourses = courses.filter(crs => 
+        (c.course_ids && c.course_ids.includes(crs.id)) || c.active_course_id === crs.id
+      ).map(crs => crs.title).join('; ');
+
+      return [
+        `"${c.centre_code || ''}"`,
+        `"${(c.centre_name || '').replace(/"/g, '""')}"`,
+        `"${(c.place || '').replace(/"/g, '""')}"`,
+        `"${(c.mahallu_name || '').replace(/"/g, '""')}"`,
+        `"${(c.panchayath_municipality || '').replace(/"/g, '""')}"`,
+        `"${c.district || ''}"`,
+        `"${c.pincode || ''}"`,
+        `"${c.status || 'ACTIVE'}"`,
+        `"${(assignedRp ? assignedRp.full_name : 'Unassigned').replace(/"/g, '""')}"`,
+        `"${(c.course_coordinator_name || '').replace(/"/g, '""')}"`,
+        `"${c.course_coordinator_phone || ''}"`,
+        `"${(c.committee_president_name || '').replace(/"/g, '""')}"`,
+        `"${c.committee_president_phone || ''}"`,
+        `"${(c.committee_secretary_name || '').replace(/"/g, '""')}"`,
+        `"${c.committee_secretary_phone || ''}"`,
+        studentCount,
+        `"${centreCourses.replace(/"/g, '""')}"`
+      ];
+    });
+
+    const csvString = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `CPET_Mahallu_Centres_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast('Exported Mahallu study centres to Excel (CSV)!');
+  };
+
   return (
     <div>
       <div className="cpet-card-header">
@@ -115,10 +183,16 @@ export const CentresManager = () => {
             Manage offline study centres across Kerala, committee office-bearers, and assign/rotate Resource Persons.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={18} />
-          Register New Centre
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" onClick={handleExportCSV}>
+            <Download size={16} />
+            Export to Excel (CSV)
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={18} />
+            Register New Centre
+          </button>
+        </div>
       </div>
 
       {/* Filters Bar */}

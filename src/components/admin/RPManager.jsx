@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { GraduationCap, UserPlus, Key, Edit2, CheckCircle, Phone, Mail, Building, MapPin } from 'lucide-react';
+import { GraduationCap, UserPlus, Key, Edit2, CheckCircle, Phone, Mail, Building, MapPin, Download } from 'lucide-react';
 
 export const RPManager = () => {
-  const { resourcePersons, addResourcePerson, centres, showToast } = useApp();
+  const { resourcePersons, addResourcePerson, centres, classLogs, showToast } = useApp();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingRp, setEditingRp] = useState(null);
 
@@ -70,6 +70,61 @@ export const RPManager = () => {
     resetForm();
   };
 
+  const handleExportCSV = () => {
+    if (resourcePersons.length === 0) {
+      showToast('No resource persons to export', 'warning');
+      return;
+    }
+
+    const headers = [
+      'RP ID',
+      'Full Name',
+      'Mobile / Phone',
+      'Email',
+      'Qualification',
+      'Status',
+      'Assigned Centres Count',
+      'Assigned Centres List',
+      'Classes Logged Count',
+      'Total Remuneration Claimed (INR)',
+      'Bank Account / UPI Details'
+    ];
+
+    const rows = resourcePersons.map(rp => {
+      const assignedCentres = (centres || []).filter(c => c.assigned_rp_id === rp.id);
+      const assignedCentresNames = assignedCentres.map(c => `${c.centre_name} (${c.place})`).join('; ');
+      const rpLogs = (classLogs || []).filter(l => l.rp_id === rp.id);
+      const totalClaimed = rpLogs.reduce((sum, l) => sum + (l.total_claim || 0), 0);
+
+      return [
+        `"${rp.id || ''}"`,
+        `"${(rp.full_name || '').replace(/"/g, '""')}"`,
+        `"${rp.phone || ''}"`,
+        `"${rp.email || ''}"`,
+        `"${(rp.qualification || '').replace(/"/g, '""')}"`,
+        '"ACTIVE"',
+        assignedCentres.length,
+        `"${assignedCentresNames.replace(/"/g, '""')}"`,
+        rpLogs.length,
+        totalClaimed,
+        `"${(rp.bank_account_details || '').replace(/"/g, '""')}"`
+      ];
+    });
+
+    const csvString = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `CPET_Faculty_RPs_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast('Exported Faculty Resource Persons to Excel (CSV)!');
+  };
+
   return (
     <div>
       <div className="cpet-card-header">
@@ -82,10 +137,16 @@ export const RPManager = () => {
             Onboard new travelling Resource Persons, set their mobile login passwords, and manage bank remuneration details.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={handleOpenAdd}>
-          <UserPlus size={16} />
-          Onboard New RP
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" onClick={handleExportCSV}>
+            <Download size={16} />
+            Export to Excel (CSV)
+          </button>
+          <button className="btn btn-primary" onClick={handleOpenAdd}>
+            <UserPlus size={16} />
+            Onboard New RP
+          </button>
+        </div>
       </div>
 
       {/* RPs Grid */}

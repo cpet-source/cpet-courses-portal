@@ -3,21 +3,43 @@ import { useApp } from '../../context/AppContext';
 import { CreditCard, Plus, CheckCircle, Clock, ArrowUpRight, DollarSign } from 'lucide-react';
 
 export const RPFeeRemittance = () => {
-  const { currentRp, centres, remittances, addRemittance, enrollments, showToast } = useApp();
+  const { currentRp, centres, courses, remittances, addRemittance, enrollments, showToast } = useApp();
   const [showModal, setShowModal] = useState(false);
 
   const assignedCentres = centres.filter(c => c.assigned_rp_id === currentRp.id);
   const rpRemittances = remittances.filter(r => r.rp_id === currentRp.id);
 
   // Form State
+  const initialCourseId = courses[0]?.id || '';
+  const initialCentresForCourse = centres.filter(c => 
+    !initialCourseId || c.active_course_id === initialCourseId || (c.course_ids && c.course_ids.includes(initialCourseId))
+  );
+
   const [formData, setFormData] = useState({
-    centre_id: assignedCentres[0]?.id || centres[0]?.id || '',
+    course_id: initialCourseId,
+    centre_id: initialCentresForCourse[0]?.id || centres[0]?.id || '',
     amount: '',
     payment_mode: 'BANK_TRANSFER',
     transaction_ref: '',
     student_count: 5,
     notes: ''
   });
+
+  const availableCentres = centres.filter(c => {
+    if (!formData.course_id) return true;
+    return c.active_course_id === formData.course_id || (c.course_ids && c.course_ids.includes(formData.course_id));
+  });
+
+  const handleCourseChange = (selectedCourseId) => {
+    const validCentres = centres.filter(c => 
+      !selectedCourseId || c.active_course_id === selectedCourseId || (c.course_ids && c.course_ids.includes(selectedCourseId))
+    );
+    setFormData(prev => ({
+      ...prev,
+      course_id: selectedCourseId,
+      centre_id: validCentres[0]?.id || (centres[0]?.id || '')
+    }));
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -29,7 +51,8 @@ export const RPFeeRemittance = () => {
     addRemittance(formData);
     setShowModal(false);
     setFormData({
-      centre_id: assignedCentres[0]?.id || centres[0]?.id || '',
+      course_id: courses[0]?.id || '',
+      centre_id: initialCentresForCourse[0]?.id || centres[0]?.id || '',
       amount: '',
       payment_mode: 'BANK_TRANSFER',
       transaction_ref: '',
@@ -69,6 +92,11 @@ export const RPFeeRemittance = () => {
                 <div>
                   <h4 className="card-title">₹{rem.amount.toLocaleString('en-IN')}</h4>
                   <p className="card-subtitle">{rem.centre_name}</p>
+                  {rem.course_title && (
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>
+                      {rem.course_title}
+                    </span>
+                  )}
                 </div>
                 <span className={`badge ${rem.status === 'CONFIRMED_BY_OFFICE' ? 'badge-success' : 'badge-warning'}`}>
                   {rem.status === 'CONFIRMED_BY_OFFICE' ? <CheckCircle size={12} /> : <Clock size={12} />}
@@ -103,17 +131,40 @@ export const RPFeeRemittance = () => {
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
                 <div className="form-group">
+                  <label className="form-label">Course / Program <span className="required">*</span></label>
+                  <select
+                    className="form-select"
+                    value={formData.course_id}
+                    onChange={e => handleCourseChange(e.target.value)}
+                  >
+                    {courses.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.title} ({c.course_code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
                   <label className="form-label">Mahallu Study Centre <span className="required">*</span></label>
                   <select
                     className="form-select"
                     value={formData.centre_id}
                     onChange={e => setFormData({ ...formData, centre_id: e.target.value })}
                   >
-                    {centres.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.centre_name} ({c.place})
-                      </option>
-                    ))}
+                    {availableCentres.length === 0 ? (
+                      centres.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.centre_name} ({c.place})
+                        </option>
+                      ))
+                    ) : (
+                      availableCentres.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.centre_name} ({c.place})
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
