@@ -92,7 +92,8 @@ export const CourseCatalog = ({ onSelectCourse }) => {
                 isDeadlinePassed = true;
               }
             }
-            const isBlocked = isClosed || isUpcoming || isDeadlinePassed;
+            const isConcluded = course.status === 'COMPLETED';
+            const isBlocked = isConcluded || isClosed || isUpcoming || isDeadlinePassed;
 
             return (
               <div key={course.id} className="cpet-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: isBlocked ? '1px solid #e2e8f0' : undefined }}>
@@ -107,19 +108,27 @@ export const CourseCatalog = ({ onSelectCourse }) => {
                       </span>
 
                       {/* Status & Deadline Badges */}
-                      {isClosed && (
-                        <span className="badge badge-danger">Registration Closed</span>
-                      )}
-                      {isUpcoming && (
-                        <span className="badge badge-accent">Opening Soon</span>
-                      )}
-                      {!isClosed && !isUpcoming && isDeadlinePassed && (
-                        <span className="badge badge-danger">Deadline Ended</span>
-                      )}
-                      {!isClosed && !isUpcoming && !isDeadlinePassed && daysRemaining !== null && (
-                        <span className="badge" style={{ background: daysRemaining <= 3 ? '#fef3c7' : '#dcfce7', color: daysRemaining <= 3 ? '#92400e' : '#166534', fontWeight: 700 }}>
-                          ⏳ {daysRemaining === 0 ? 'Last Day!' : `${daysRemaining} days left`}
+                      {isConcluded ? (
+                        <span className="badge badge-neutral" style={{ background: '#e2e8f0', color: '#475569', fontWeight: 600 }}>
+                          🏁 Program Concluded
                         </span>
+                      ) : (
+                        <>
+                          {isClosed && (
+                            <span className="badge badge-danger">Registration Closed</span>
+                          )}
+                          {isUpcoming && (
+                            <span className="badge badge-accent">Opening Soon</span>
+                          )}
+                          {!isClosed && !isUpcoming && isDeadlinePassed && (
+                            <span className="badge badge-danger">Deadline Ended</span>
+                          )}
+                          {!isClosed && !isUpcoming && !isDeadlinePassed && daysRemaining !== null && (
+                            <span className="badge" style={{ background: daysRemaining <= 3 ? '#fef3c7' : '#dcfce7', color: daysRemaining <= 3 ? '#92400e' : '#166534', fontWeight: 700 }}>
+                              ⏳ {daysRemaining === 0 ? 'Last Day!' : `${daysRemaining} days left`}
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
 
@@ -166,7 +175,7 @@ export const CourseCatalog = ({ onSelectCourse }) => {
                       style={{ flex: 1, opacity: 0.7, cursor: 'not-allowed' }}
                       disabled
                     >
-                      {isClosed ? 'Registration Closed' : isUpcoming ? 'Opening Soon' : 'Deadline Passed'}
+                      {isConcluded ? 'Program Concluded' : isClosed ? 'Registration Closed' : isUpcoming ? 'Opening Soon' : 'Deadline Passed'}
                     </button>
                   ) : (
                     <button

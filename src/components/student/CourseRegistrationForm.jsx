@@ -25,6 +25,8 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
   const isMahallu = course?.category === 'MAHALLU';
   const availableCentres = centres.filter(c => {
     if (!isMahallu || !course) return false;
+    if (c.status === 'INACTIVE') return false;
+    if (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(course.id)) return false;
     const isDirect = c.active_course_id === course.id;
     const inList = Array.isArray(c.course_ids) && c.course_ids.includes(course.id);
     return isDirect || inList;

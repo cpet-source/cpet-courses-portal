@@ -27,26 +27,43 @@ export const RPAcademicEvaluation = () => {
     showToast
   } = useApp();
 
-  // 1. Course Selection (prioritize Mahallu courses)
-  const mahalluCourses = courses.filter(c => c.category === 'MAHALLU');
-  const availableCourses = mahalluCourses.length > 0 ? mahalluCourses : courses;
+  // View Mode: 'ACTIVE' (Default) vs 'ARCHIVED' (Past / Completed Batches)
+  const [viewMode, setViewMode] = useState('ACTIVE');
+
+  // 1. Course Selection (filtered by active vs concluded)
+  const baseCourses = courses.filter(c => {
+    if (viewMode === 'ACTIVE') {
+      return c.status !== 'COMPLETED';
+    } else {
+      return c.status === 'COMPLETED' || centres.some(ctr => ctr.completed_course_ids?.includes(c.id));
+    }
+  });
+
+  const mahalluCourses = baseCourses.filter(c => c.category === 'MAHALLU');
+  const availableCourses = mahalluCourses.length > 0 ? mahalluCourses : baseCourses;
   const [selectedCourseId, setSelectedCourseId] = useState(availableCourses[0]?.id || '');
 
   useEffect(() => {
-    if (!selectedCourseId && availableCourses.length > 0) {
-      setSelectedCourseId(availableCourses[0].id);
+    if (!availableCourses.some(c => c.id === selectedCourseId)) {
+      setSelectedCourseId(availableCourses[0]?.id || '');
     }
   }, [availableCourses, selectedCourseId]);
 
   const selectedCourse = courses.find(c => c.id === selectedCourseId) || availableCourses[0];
 
-  // 2. Study Centres running selected course
+  // 2. Study Centres running selected course (filtered by active vs completed)
   const courseCentres = centres.filter(c => {
     if (!selectedCourseId) return false;
     const isDirect = c.active_course_id === selectedCourseId;
     const inList = Array.isArray(c.course_ids) && c.course_ids.includes(selectedCourseId);
     const hasEnrollment = enrollments.some(e => e.course_id === selectedCourseId && e.centre_id === c.id);
-    return isDirect || inList || hasEnrollment;
+    const isAttached = isDirect || inList || hasEnrollment;
+    if (!isAttached) return false;
+
+    const isBatchCompleted = selectedCourse?.status === 'COMPLETED' || 
+                             (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(selectedCourseId));
+
+    return viewMode === 'ACTIVE' ? !isBatchCompleted : isBatchCompleted;
   });
 
   const [selectedCentreId, setSelectedCentreId] = useState(courseCentres[0]?.id || centres[0]?.id || '');
@@ -55,7 +72,7 @@ export const RPAcademicEvaluation = () => {
     if (courseCentres.length > 0 && !courseCentres.some(c => c.id === selectedCentreId)) {
       setSelectedCentreId(courseCentres[0].id);
     }
-  }, [selectedCourseId, centres, enrollments]);
+  }, [selectedCourseId, centres, enrollments, viewMode]);
 
   const selectedCentre = centres.find(c => c.id === selectedCentreId) || courseCentres[0];
 
@@ -111,6 +128,50 @@ export const RPAcademicEvaluation = () => {
             Enter exam marks across all subjects and maintain session-by-session class attendance for your student batches.
           </p>
         </div>
+      </div>
+
+      {/* Active Batches vs Past/Completed Batches Toggle (Option A) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'inline-flex', background: '#e2e8f0', padding: '3px', borderRadius: '8px' }}>
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{
+              background: viewMode === 'ACTIVE' ? 'var(--cpet-primary)' : 'transparent',
+              color: viewMode === 'ACTIVE' ? '#fff' : '#475569',
+              border: 'none',
+              boxShadow: viewMode === 'ACTIVE' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              padding: '0.35rem 0.85rem'
+            }}
+            onClick={() => setViewMode('ACTIVE')}
+          >
+            🟢 Active Ongoing Batches
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{
+              background: viewMode === 'ARCHIVED' ? 'var(--cpet-primary)' : 'transparent',
+              color: viewMode === 'ARCHIVED' ? '#fff' : '#475569',
+              border: 'none',
+              boxShadow: viewMode === 'ARCHIVED' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              padding: '0.35rem 0.85rem'
+            }}
+            onClick={() => setViewMode('ARCHIVED')}
+          >
+            🎓 Past / Completed Batches
+          </button>
+        </div>
+
+        {viewMode === 'ARCHIVED' && (
+          <span style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
+            Viewing concluded/archived batch evaluation records.
+          </span>
+        )}
       </div>
 
       {/* Selectors Bar: Course & Centre */}

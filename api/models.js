@@ -41,6 +41,7 @@ const CentreSchema = new mongoose.Schema({
   assigned_rp_id: String,
   active_course_id: String,
   course_ids: [String],
+  completed_course_ids: [String],
   status: { type: String, default: 'ACTIVE' }
 }, { timestamps: true });
 

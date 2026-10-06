@@ -31,31 +31,47 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
     showToast
   } = useApp();
 
-  // 1. Course Filter (Mahallu courses prioritized)
-  const mahalluCourses = courses.filter(c => c.category === 'MAHALLU');
-  const availableCourses = mahalluCourses.length > 0 ? mahalluCourses : courses;
+  // View Mode: 'ACTIVE' (Default - uncluttered) vs 'ARCHIVED' (Past / Completed Batches)
+  const [viewMode, setViewMode] = useState('ACTIVE');
+
+  // 1. Course Filter (Mahallu courses prioritized, filtered by lifecycle mode)
+  const baseCourses = courses.filter(c => {
+    if (viewMode === 'ACTIVE') {
+      return c.status !== 'COMPLETED';
+    } else {
+      return c.status === 'COMPLETED' || centres.some(ctr => ctr.completed_course_ids?.includes(c.id));
+    }
+  });
+
+  const mahalluCourses = baseCourses.filter(c => c.category === 'MAHALLU');
+  const availableCourses = mahalluCourses.length > 0 ? mahalluCourses : baseCourses;
 
   const [selectedCourseId, setSelectedCourseId] = useState(availableCourses[0]?.id || '');
 
-  // Keep selectedCourseId valid when courses load
+  // Keep selectedCourseId valid when courses load or viewMode changes
   useEffect(() => {
     if (!selectedCourseId && availableCourses.length > 0) {
       setSelectedCourseId(availableCourses[0].id);
-    } else if (selectedCourseId && !courses.some(c => c.id === selectedCourseId) && availableCourses.length > 0) {
+    } else if (selectedCourseId && !availableCourses.some(c => c.id === selectedCourseId) && availableCourses.length > 0) {
       setSelectedCourseId(availableCourses[0].id);
     }
-  }, [availableCourses, selectedCourseId, courses]);
+  }, [availableCourses, selectedCourseId]);
 
   const selectedCourse = courses.find(c => c.id === selectedCourseId) || availableCourses[0];
 
-  // 2. Centres running the selected course
-  // A centre runs a course if active_course_id matches, course_ids includes it, or students are enrolled in it
+  // 2. Centres running the selected course (filtered by active vs completed)
   const centresForCourse = centres.filter(c => {
     if (!selectedCourseId) return false;
     const isDirect = c.active_course_id === selectedCourseId;
     const inList = Array.isArray(c.course_ids) && c.course_ids.includes(selectedCourseId);
     const hasStudents = enrollments.some(e => e.course_id === selectedCourseId && e.centre_id === c.id);
-    return isDirect || inList || hasStudents;
+    const isAttached = isDirect || inList || hasStudents;
+    if (!isAttached) return false;
+
+    const isBatchCompleted = selectedCourse?.status === 'COMPLETED' || 
+                             (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(selectedCourseId));
+
+    return viewMode === 'ACTIVE' ? !isBatchCompleted : isBatchCompleted;
   });
 
   const [selectedCentreId, setSelectedCentreId] = useState(centresForCourse[0]?.id || '');
@@ -70,7 +86,7 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
     } else {
       setSelectedCentreId('');
     }
-  }, [selectedCourseId, centres, enrollments]);
+  }, [selectedCourseId, centres, enrollments, viewMode]);
 
   const selectedCentre = centres.find(c => c.id === selectedCentreId);
 
@@ -83,9 +99,10 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
   const [modalCourseId, setModalCourseId] = useState(selectedCourseId || availableCourses[0]?.id || '');
   const [modalCentreId, setModalCentreId] = useState(selectedCentreId || '');
 
-  // Compute available centres for the course selected inside modal
+  // Compute available active centres for the course selected inside modal
   const modalCentresForCourse = centres.filter(c => {
     if (!modalCourseId) return false;
+    if (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(modalCourseId)) return false;
     const isDirect = c.active_course_id === modalCourseId;
     const inList = Array.isArray(c.course_ids) && c.course_ids.includes(modalCourseId);
     const hasStudents = enrollments.some(e => e.course_id === modalCourseId && e.centre_id === c.id);
@@ -96,6 +113,7 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
   const handleModalCourseChange = (newCourseId) => {
     setModalCourseId(newCourseId);
     const availableForNewCourse = centres.filter(c => {
+      if (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(newCourseId)) return false;
       const isDirect = c.active_course_id === newCourseId;
       const inList = Array.isArray(c.course_ids) && c.course_ids.includes(newCourseId);
       const hasStudents = enrollments.some(e => e.course_id === newCourseId && e.centre_id === c.id);
@@ -252,6 +270,50 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
             Onboard Student
           </button>
         </div>
+      </div>
+
+      {/* Active Batches vs Past/Completed Batches Toggle (Option A) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'inline-flex', background: '#e2e8f0', padding: '3px', borderRadius: '8px' }}>
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{
+              background: viewMode === 'ACTIVE' ? 'var(--cpet-primary)' : 'transparent',
+              color: viewMode === 'ACTIVE' ? '#fff' : '#475569',
+              border: 'none',
+              boxShadow: viewMode === 'ACTIVE' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              padding: '0.35rem 0.85rem'
+            }}
+            onClick={() => setViewMode('ACTIVE')}
+          >
+            🟢 Active Ongoing Batches
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{
+              background: viewMode === 'ARCHIVED' ? 'var(--cpet-primary)' : 'transparent',
+              color: viewMode === 'ARCHIVED' ? '#fff' : '#475569',
+              border: 'none',
+              boxShadow: viewMode === 'ARCHIVED' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              padding: '0.35rem 0.85rem'
+            }}
+            onClick={() => setViewMode('ARCHIVED')}
+          >
+            🎓 Past / Completed Batches
+          </button>
+        </div>
+
+        {viewMode === 'ARCHIVED' && (
+          <span style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
+            Viewing concluded/graduated batches. Records are read-only archival data.
+          </span>
+        )}
       </div>
 
       {/* STEP 1: Mahallu Course Selector */}

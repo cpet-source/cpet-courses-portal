@@ -7,9 +7,11 @@ export const RPClassLogger = () => {
   const [showLogModal, setShowLogModal] = useState(false);
   const [editingLog, setEditingLog] = useState(null);
 
-  const initialCourseId = courses[0]?.id || '';
+  const activeCourses = courses.filter(c => c.status !== 'COMPLETED');
+  const initialCourseId = activeCourses[0]?.id || courses[0]?.id || '';
   const initialCentresForCourse = centres.filter(c => {
     if (!initialCourseId) return false;
+    if (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(initialCourseId)) return false;
     return c.active_course_id === initialCourseId || (Array.isArray(c.course_ids) && c.course_ids.includes(initialCourseId));
   });
 
@@ -33,9 +35,12 @@ export const RPClassLogger = () => {
     syllabus_covered: ''
   });
 
-  // Calculate centres running the currently selected course in Add form
+  // Calculate centres running the currently selected course in Add form (active ongoing batches only)
   const availableCentresForAdd = formData.course_id
-    ? centres.filter(c => c.active_course_id === formData.course_id || (Array.isArray(c.course_ids) && c.course_ids.includes(formData.course_id)))
+    ? centres.filter(c => {
+        if (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(formData.course_id)) return false;
+        return c.active_course_id === formData.course_id || (Array.isArray(c.course_ids) && c.course_ids.includes(formData.course_id));
+      })
     : [];
 
   // Calculate centres running the currently selected course in Edit form
@@ -45,6 +50,7 @@ export const RPClassLogger = () => {
 
   const handleCourseChange = (newCourseId) => {
     const matchingCentres = centres.filter(c => {
+      if (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(newCourseId)) return false;
       return c.active_course_id === newCourseId || (Array.isArray(c.course_ids) && c.course_ids.includes(newCourseId));
     });
 
@@ -238,7 +244,7 @@ export const RPClassLogger = () => {
                     style={{ fontWeight: 600 }}
                   >
                     <option value="">-- Select Course --</option>
-                    {courses.map(c => (
+                    {activeCourses.map(c => (
                       <option key={c.id} value={c.id}>
                         {c.title} ({c.course_code}) [{c.category?.replace('_', ' ')}]
                       </option>

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download, Building } from 'lucide-react';
 
 export const CoursesManager = () => {
-  const { courses, enrollments, addCourse, updateCourse, showToast, setActiveRole } = useApp();
+  const { courses, centres, enrollments, addCourse, updateCourse, toggleCourseStatus, toggleCentreCourseCompletion, showToast, setActiveRole } = useApp();
   const [filterCategory, setFilterCategory] = useState('ALL');
   const [showModal, setShowModal] = useState(false);
   const [editingCourseId, setEditingCourseId] = useState(null);
@@ -366,6 +366,113 @@ export const CoursesManager = () => {
                     {course.payment_policy.replace(/_/g, ' ')}
                   </span>
                 )}
+              </div>
+
+              {/* Participating Centres & Batch Lifecycle Section */}
+              <div style={{ marginTop: '0.85rem', borderTop: '1px solid var(--cpet-border)', paddingTop: '0.75rem', background: '#f8fafc', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Building size={15} color="var(--cpet-primary)" />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--cpet-primary)' }}>
+                      Centres & Batches ({
+                        centres.filter(c => 
+                          c.active_course_id === course.id || 
+                          (Array.isArray(c.course_ids) && c.course_ids.includes(course.id)) ||
+                          enrollments.some(e => e.course_id === course.id && e.centre_id === c.id)
+                        ).length
+                      })
+                    </span>
+                  </div>
+
+                  {/* Course Global Status (For camps/workshops or global conclusion) */}
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${course.status === 'COMPLETED' ? 'btn-secondary' : 'btn-outline'}`}
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '0.2rem 0.5rem',
+                      background: course.status === 'COMPLETED' ? '#e2e8f0' : 'white',
+                      color: course.status === 'COMPLETED' ? '#475569' : '#047857',
+                      borderColor: course.status === 'COMPLETED' ? '#94a3b8' : '#10b981'
+                    }}
+                    onClick={() => toggleCourseStatus(course.id)}
+                    title="Conclude or re-activate the entire course globally (useful for workshops and camps)"
+                  >
+                    {course.status === 'COMPLETED' ? '🏁 Concluded (Reopen)' : '🏁 Conclude Course'}
+                  </button>
+                </div>
+
+                {course.status === 'COMPLETED' && (
+                  <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '4px', padding: '0.4rem 0.6rem', fontSize: '0.75rem', color: '#92400e', marginBottom: '0.5rem', fontWeight: 600 }}>
+                    🏁 Program concluded globally. Hidden from active RP portal.
+                  </div>
+                )}
+
+                {(() => {
+                  const participatingCentres = centres.filter(c => 
+                    c.active_course_id === course.id || 
+                    (Array.isArray(c.course_ids) && c.course_ids.includes(course.id)) ||
+                    enrollments.some(e => e.course_id === course.id && e.centre_id === c.id)
+                  );
+
+                  if (participatingCentres.length === 0) {
+                    return (
+                      <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0, fontStyle: 'italic' }}>
+                        No study centres currently attached to this course.
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
+                      {participatingCentres.map(c => {
+                        const isBatchCompleted = course.status === 'COMPLETED' || (c.completed_course_ids && c.completed_course_ids.includes(course.id));
+                        const enrolledCount = enrollments.filter(e => e.course_id === course.id && e.centre_id === c.id).length;
+
+                        return (
+                          <div
+                            key={c.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.45rem 0.65rem',
+                              borderRadius: '6px',
+                              background: isBatchCompleted ? '#f1f5f9' : 'white',
+                              border: `1px solid ${isBatchCompleted ? '#cbd5e1' : '#bbf7d0'}`,
+                              gap: '0.5rem'
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <strong style={{ fontSize: '0.8rem', color: isBatchCompleted ? '#64748b' : 'var(--cpet-primary)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {c.centre_name} ({c.place})
+                              </strong>
+                              <span style={{ fontSize: '0.72rem', color: isBatchCompleted ? '#64748b' : '#059669', fontWeight: 600 }}>
+                                {enrolledCount} students • {isBatchCompleted ? '🎓 Batch Completed' : '🟢 Batch Ongoing'}
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              className={`btn btn-sm ${isBatchCompleted ? 'btn-secondary' : 'btn-outline'}`}
+                              style={{
+                                fontSize: '0.7rem',
+                                padding: '0.25rem 0.55rem',
+                                whiteSpace: 'nowrap',
+                                color: isBatchCompleted ? 'var(--cpet-text)' : '#0284c7',
+                                borderColor: isBatchCompleted ? '#cbd5e1' : '#38bdf8'
+                              }}
+                              onClick={() => toggleCentreCourseCompletion(c.id, course.id)}
+                              title={isBatchCompleted ? "Re-activate this batch so it appears in RP active dropdowns" : "Mark completed & archive from RP active dropdowns"}
+                            >
+                              {isBatchCompleted ? 'Re-activate' : '🎓 Mark Complete'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

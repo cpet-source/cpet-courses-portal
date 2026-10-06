@@ -393,6 +393,57 @@ export const AppProvider = ({ children }) => {
     showToast('Course updated successfully!');
   };
 
+  const toggleCourseStatus = (courseId) => {
+    let nextStatus = 'COMPLETED';
+    setCourses(prev => prev.map(c => {
+      if (c.id === courseId) {
+        nextStatus = c.status === 'COMPLETED' ? 'ACTIVE' : 'COMPLETED';
+        const updated = { ...c, status: nextStatus };
+        syncToCloud('Course', updated);
+        return updated;
+      }
+      return c;
+    }));
+
+    const targetCourse = courses.find(c => c.id === courseId);
+    showToast(
+      nextStatus === 'COMPLETED'
+        ? `Program "${targetCourse?.title || 'Course'}" marked as CONCLUDED & ARCHIVED!`
+        : `Program "${targetCourse?.title || 'Course'}" re-activated as ONGOING!`,
+      nextStatus === 'COMPLETED' ? 'warning' : 'success'
+    );
+  };
+
+  const toggleCentreCourseCompletion = (centreId, courseId) => {
+    let isNowCompleted = true;
+    setCentres(prev => prev.map(c => {
+      if (c.id === centreId) {
+        const completed = Array.isArray(c.completed_course_ids) ? [...c.completed_course_ids] : [];
+        let updatedCompleted;
+        if (completed.includes(courseId)) {
+          updatedCompleted = completed.filter(id => id !== courseId);
+          isNowCompleted = false;
+        } else {
+          updatedCompleted = [...completed, courseId];
+          isNowCompleted = true;
+        }
+        const updated = { ...c, completed_course_ids: updatedCompleted };
+        syncToCloud('Centre', updated);
+        return updated;
+      }
+      return c;
+    }));
+
+    const targetCourse = courses.find(crs => crs.id === courseId);
+    const targetCentre = centres.find(ctr => ctr.id === centreId);
+    showToast(
+      isNowCompleted
+        ? `Batch for "${targetCourse?.title || 'Course'}" at "${targetCentre?.centre_name || 'Centre'}" completed & archived!`
+        : `Batch for "${targetCourse?.title || 'Course'}" at "${targetCentre?.centre_name || 'Centre'}" re-activated!`,
+      isNowCompleted ? 'success' : 'info'
+    );
+  };
+
   // 2. Study Centre Management
   const addCentre = (centreData) => {
     const newCode = `MHL-${(centreData.district || 'KRL').substring(0, 3).toUpperCase()}-${String(centres.length + 1).padStart(3, '0')}`;
@@ -889,6 +940,8 @@ export const AppProvider = ({ children }) => {
         // Methods
         addCourse,
         updateCourse,
+        toggleCourseStatus,
+        toggleCentreCourseCompletion,
         addCentre,
         updateCentre,
         deleteCentre,
