@@ -158,7 +158,26 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
   };
 
   return (
-    <div className="cpet-card" style={{ maxWidth: '680px', margin: '0 auto' }}>
+    <div className="cpet-card" style={{ maxWidth: '680px', margin: '0 auto', overflow: 'hidden' }}>
+      {/* 400x1600 Google Form Style Header Banner */}
+      {course.poster_url && (
+        <div style={{
+          width: 'calc(100% + 3rem)',
+          margin: '-1.5rem -1.5rem 1.25rem -1.5rem',
+          aspectRatio: '4 / 1',
+          maxHeight: '170px',
+          overflow: 'hidden',
+          background: '#0f172a',
+          borderBottom: '1px solid var(--cpet-border)'
+        }}>
+          <img
+            src={course.poster_url}
+            alt={course.title}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        </div>
+      )}
+
       <button className="btn btn-secondary btn-sm" onClick={onBack} style={{ marginBottom: '1rem' }}>
         <ArrowLeft size={14} /> Back to Courses
       </button>

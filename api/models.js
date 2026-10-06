@@ -17,6 +17,7 @@ const CourseSchema = new mongoose.Schema({
   status: { type: String, default: 'ACTIVE' },
   registration_status: { type: String, default: 'OPEN' }, // 'OPEN' | 'CLOSED' | 'UPCOMING'
   registration_deadline: String, // 'YYYY-MM-DD'
+  poster_url: String, // Base64 data URL or external image URL
   subjects: [mongoose.Schema.Types.Mixed],
   custom_questions: [mongoose.Schema.Types.Mixed]
 }, { timestamps: true });

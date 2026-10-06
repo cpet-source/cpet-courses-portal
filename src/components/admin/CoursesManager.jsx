@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download, Building } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download, Building, Upload, Image as ImageIcon } from 'lucide-react';
 
 export const CoursesManager = () => {
   const { courses, centres, enrollments, addCourse, updateCourse, toggleCourseStatus, toggleCentreCourseCompletion, showToast, setActiveRole } = useApp();
@@ -14,6 +14,7 @@ export const CoursesManager = () => {
     course_code: '',
     category: 'MAHALLU',
     description: '',
+    poster_url: '',
     evaluation_type: 'EXAM_ONLY',
     payment_policy: 'COLLECTED_BY_RP',
     registration_status: 'OPEN',
@@ -35,6 +36,7 @@ export const CoursesManager = () => {
       course_code: '',
       category: 'MAHALLU',
       description: '',
+      poster_url: '',
       evaluation_type: 'EXAM_ONLY',
       payment_policy: 'COLLECTED_BY_RP',
       registration_status: 'OPEN',
@@ -64,6 +66,7 @@ export const CoursesManager = () => {
       course_code: course.course_code || '',
       category: course.category || 'MAHALLU',
       description: course.description || '',
+      poster_url: course.poster_url || '',
       evaluation_type: course.evaluation_type || 'EXAM_ONLY',
       payment_policy: course.payment_policy || 'COLLECTED_BY_RP',
       registration_status: course.registration_status || 'OPEN',
@@ -77,6 +80,43 @@ export const CoursesManager = () => {
       custom_questions: course.custom_questions || []
     });
     setShowModal(true);
+  };
+
+  const handlePosterFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Please upload an image file (PNG, JPG, WebP)', 'danger');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxWidth = 1600;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+        setFormData(prev => ({ ...prev, poster_url: compressedBase64 }));
+        showToast('Poster banner uploaded & optimized successfully!');
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   // Subject Builder Handlers
@@ -293,8 +333,25 @@ export const CoursesManager = () => {
       {/* Course List Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.25rem' }}>
         {filteredCourses.map(course => (
-          <div key={course.id} className="cpet-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div key={course.id} className="cpet-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', overflow: 'hidden' }}>
             <div>
+              {course.poster_url && (
+                <div style={{
+                  width: 'calc(100% + 3rem)',
+                  margin: '-1.5rem -1.5rem 0.85rem -1.5rem',
+                  aspectRatio: '4 / 1',
+                  maxHeight: '90px',
+                  overflow: 'hidden',
+                  background: '#0f172a'
+                }}>
+                  <img
+                    src={course.poster_url}
+                    alt={course.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem', gap: '0.5rem' }}>
                 <span className={`badge ${
                   course.category === 'MAHALLU' ? 'badge-primary' :
@@ -610,6 +667,69 @@ export const CoursesManager = () => {
                     value={formData.description}
                     onChange={e => setFormData({ ...formData, description: e.target.value })}
                   />
+                </div>
+
+                {/* Course Banner Poster Upload (400x1600 Google Form Style) */}
+                <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--cpet-border)', marginTop: '0.75rem', marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <ImageIcon size={16} /> Course Poster Banner
+                    </label>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      Compact landscape banner (Google Form style, ~400×1600 px)
+                    </span>
+                  </div>
+
+                  {formData.poster_url ? (
+                    <div>
+                      <div style={{ width: '100%', aspectRatio: '4 / 1', maxHeight: '120px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #cbd5e1', marginBottom: '0.5rem', background: '#0f172a' }}>
+                        <img
+                          src={formData.poster_url}
+                          alt="Poster Preview"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          style={{ fontSize: '0.75rem', color: '#ef4444' }}
+                          onClick={() => setFormData(prev => ({ ...prev, poster_url: '' }))}
+                        >
+                          ✕ Remove Banner
+                        </button>
+                        <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600 }}>
+                          ✓ Banner attached & optimized
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                          <Upload size={14} /> Upload Banner File
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={handlePosterFileUpload}
+                          />
+                        </label>
+                        <span style={{ fontSize: '0.78rem', color: '#64748b' }}>or paste image URL:</span>
+                        <input
+                          type="url"
+                          className="form-input"
+                          style={{ flex: 1, minWidth: '180px', fontSize: '0.82rem', padding: '0.4rem 0.6rem' }}
+                          placeholder="https://example.com/poster-banner.jpg"
+                          value={formData.poster_url || ''}
+                          onChange={e => setFormData(prev => ({ ...prev, poster_url: e.target.value }))}
+                        />
+                      </div>
+                      <p style={{ fontSize: '0.73rem', color: '#64748b', marginTop: '0.4rem', margin: 0 }}>
+                        Appears at the top of the course card in public catalog and the student registration form.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <hr style={{ border: 'none', borderTop: '1px solid var(--cpet-border)', margin: '1.25rem 0' }} />

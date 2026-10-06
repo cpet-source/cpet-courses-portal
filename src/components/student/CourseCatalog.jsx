@@ -96,8 +96,45 @@ export const CourseCatalog = ({ onSelectCourse }) => {
             const isBlocked = isConcluded || isClosed || isUpcoming || isDeadlinePassed;
 
             return (
-              <div key={course.id} className="cpet-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: isBlocked ? '1px solid #e2e8f0' : undefined }}>
+              <div key={course.id} className="cpet-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', overflow: 'hidden', border: isBlocked ? '1px solid #e2e8f0' : undefined }}>
                 <div>
+                  {/* Google Form Style 4:1 Compact Banner */}
+                  {course.poster_url ? (
+                    <div style={{
+                      width: 'calc(100% + 3rem)',
+                      margin: '-1.5rem -1.5rem 1rem -1.5rem',
+                      aspectRatio: '4 / 1',
+                      maxHeight: '110px',
+                      overflow: 'hidden',
+                      background: '#0f172a'
+                    }}>
+                      <img
+                        src={course.poster_url}
+                        alt={course.title}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                    </div>
+                  ) : (
+                    <div style={{
+                      width: 'calc(100% + 3rem)',
+                      margin: '-1.5rem -1.5rem 1rem -1.5rem',
+                      height: '55px',
+                      overflow: 'hidden',
+                      background: course.category === 'MAHALLU'
+                        ? 'linear-gradient(135deg, #064e3b 0%, #047857 100%)'
+                        : course.category === 'GENERAL_ONLINE'
+                        ? 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)'
+                        : 'linear-gradient(135deg, #78350f 0%, #d97706 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '0 1.25rem'
+                    }}>
+                      <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.05em' }}>
+                        CPET • {course.course_code}
+                      </span>
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.35rem' }}>
                     <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                       <span className={`badge ${
