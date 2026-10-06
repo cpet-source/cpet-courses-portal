@@ -454,6 +454,8 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
               <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
                 Centre: <strong>{selectedCentre.centre_name}</strong> ({selectedCentre.place}, {selectedCentre.district})
                 {selectedCentre.committee_president_phone && ` | Pres: ${selectedCentre.committee_president_phone}`}
+                {selectedCentre.committee_secretary_phone && ` | Sec: ${selectedCentre.committee_secretary_phone}`}
+                {selectedCentre.course_coordinator_phone && ` | Coord: ${selectedCentre.course_coordinator_name ? selectedCentre.course_coordinator_name + ' (' + selectedCentre.course_coordinator_phone + ')' : selectedCentre.course_coordinator_phone}`}
               </p>
             </div>
 

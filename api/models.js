@@ -34,6 +34,8 @@ const CentreSchema = new mongoose.Schema({
   committee_president_phone: String,
   committee_secretary_name: String,
   committee_secretary_phone: String,
+  course_coordinator_name: String,
+  course_coordinator_phone: String,
   founded_by_rp_id: String,
   founded_by_rp_name: String,
   assigned_rp_id: String,

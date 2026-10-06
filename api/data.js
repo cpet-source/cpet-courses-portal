@@ -177,6 +177,25 @@ export default async function handler(req, res) {
         }
       }
 
+      if (type === 'DELETE_ENTITY') {
+        const { entityName, id, account_phone } = payload || {};
+        let Model;
+        if (entityName === 'Course') Model = Course;
+        if (entityName === 'Centre') Model = Centre;
+        if (entityName === 'ResourcePerson') Model = ResourcePerson;
+        if (entityName === 'StudentAccount') Model = StudentAccount;
+        if (entityName === 'Enrollment') Model = Enrollment;
+        if (entityName === 'ClassLog') Model = ClassLog;
+        if (entityName === 'Remittance') Model = Remittance;
+        if (entityName === 'Payout') Model = Payout;
+
+        if (Model) {
+          const filter = id ? { id } : { account_phone };
+          await Model.deleteOne(filter);
+          return res.status(200).json({ success: true, message: `${entityName} deleted.` });
+        }
+      }
+
       return res.status(400).json({ error: 'Unknown operation type' });
     }
 

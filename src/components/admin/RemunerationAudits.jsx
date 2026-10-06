@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { CheckCircle, Clock, DollarSign, UserCheck, AlertCircle, FileText, Send } from 'lucide-react';
+import { CheckCircle, Clock, DollarSign, UserCheck, AlertCircle, FileText, Send, Trash2 } from 'lucide-react';
 
 export const RemunerationAudits = () => {
-  const { classLogs, resourcePersons, verifyClassLog, disbursePayout, payouts, showToast } = useApp();
+  const { classLogs, resourcePersons, verifyClassLog, deleteClassLog, disbursePayout, payouts, showToast } = useApp();
   const [filterRp, setFilterRp] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [showPayoutModal, setShowPayoutModal] = useState(false);
@@ -21,11 +21,16 @@ export const RemunerationAudits = () => {
     billing_month: '2026-10'
   });
 
-  const filteredLogs = classLogs.filter(log => {
-    if (filterRp !== 'ALL' && log.rp_id !== filterRp) return false;
-    if (filterStatus !== 'ALL' && log.status !== filterStatus) return false;
-    return true;
-  });
+  const filteredLogs = classLogs
+    .filter(log => {
+      if (filterRp !== 'ALL' && log.rp_id !== filterRp) return false;
+      if (filterStatus !== 'ALL' && log.status !== filterStatus) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (b.class_date !== a.class_date) return (b.class_date || '').localeCompare(a.class_date || '');
+      return (b.id || '').localeCompare(a.id || '');
+    });
 
   const handleStartVerify = (log) => {
     setVerifyingLogId(log.id);
@@ -233,7 +238,7 @@ export const RemunerationAudits = () => {
                       </span>
                     )}
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                     {log.status === 'SUBMITTED' && (
                       <button
                         className="btn btn-primary btn-sm"
@@ -255,6 +260,18 @@ export const RemunerationAudits = () => {
                         ✓ Paid
                       </span>
                     )}
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      style={{ color: '#dc2626', marginLeft: '0.4rem', padding: '0.35rem 0.55rem' }}
+                      title="Delete Class Log"
+                      onClick={() => {
+                        if (window.confirm(`Delete class log for "${log.centre_name}" on ${log.class_date}?`)) {
+                          deleteClassLog(log.id);
+                        }
+                      }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </td>
                 </tr>
               ))

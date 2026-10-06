@@ -136,6 +136,25 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Helper to delete an entity from MongoDB
+  const deleteFromCloud = async (entityName, id) => {
+    try {
+      const res = await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'DELETE_ENTITY',
+          payload: { entityName, id }
+        })
+      });
+      const data = await res.json();
+      return !!data?.success;
+    } catch (e) {
+      console.warn('Network delete error:', e);
+      return false;
+    }
+  };
+
   // Sync all local data to MongoDB cloud (e.g. after fixing credentials)
   const syncAllLocalDataToCloud = async () => {
     try {
@@ -445,6 +464,24 @@ export const AppProvider = ({ children }) => {
     showToast('Resource Person assigned to Centre.');
   };
 
+  const updateCentre = (centreId, updatedFields) => {
+    setCentres(prev => prev.map(c => {
+      if (c.id === centreId) {
+        const updated = { ...c, ...updatedFields };
+        syncToCloud('Centre', updated);
+        return updated;
+      }
+      return c;
+    }));
+    showToast('Study Centre details updated successfully!');
+  };
+
+  const deleteCentre = (centreId) => {
+    setCentres(prev => prev.filter(c => c.id !== centreId));
+    deleteFromCloud('Centre', centreId);
+    showToast('Study Centre deleted successfully.');
+  };
+
   // 3. Resource Person Management
   const addResourcePerson = (rpData) => {
     const newRp = {
@@ -603,6 +640,37 @@ export const AppProvider = ({ children }) => {
     syncToCloud('ClassLog', newLog);
     showToast('Class log submitted successfully to CPET Office!');
     return newLog;
+  };
+
+  const updateClassLog = (logId, updatedFields) => {
+    setClassLogs(prev => prev.map(log => {
+      if (log.id === logId) {
+        const targetCourse = courses.find(c => c.id === (updatedFields.course_id || log.course_id));
+        const targetCentre = centres.find(c => c.id === (updatedFields.centre_id || log.centre_id));
+        const standardRate = updatedFields.standard_rate || log.standard_rate || targetCourse?.default_rp_remuneration_per_class || 800;
+        const travelAllowance = Number(updatedFields.travel_allowance !== undefined ? updatedFields.travel_allowance : (log.travel_allowance || 0));
+
+        const updated = {
+          ...log,
+          ...updatedFields,
+          centre_name: targetCentre ? targetCentre.centre_name : log.centre_name,
+          course_title: targetCourse ? targetCourse.title : log.course_title,
+          standard_rate: standardRate,
+          travel_allowance: travelAllowance,
+          total_claim: standardRate + travelAllowance
+        };
+        syncToCloud('ClassLog', updated);
+        return updated;
+      }
+      return log;
+    }));
+    showToast('Class log updated successfully!');
+  };
+
+  const deleteClassLog = (logId) => {
+    setClassLogs(prev => prev.filter(l => l.id !== logId));
+    deleteFromCloud('ClassLog', logId);
+    showToast('Class log deleted successfully.');
   };
 
   const verifyClassLog = (logId, approvedAmount, adminNotes) => {
@@ -810,6 +878,8 @@ export const AppProvider = ({ children }) => {
         addCourse,
         updateCourse,
         addCentre,
+        updateCentre,
+        deleteCentre,
         addCourseToCentre,
         updateCentreStatus,
         assignRpToCentre,
@@ -817,6 +887,8 @@ export const AppProvider = ({ children }) => {
         lookupStudentByPhone,
         registerOrEnrollStudent,
         addClassLog,
+        updateClassLog,
+        deleteClassLog,
         verifyClassLog,
         addRemittance,
         confirmRemittance,

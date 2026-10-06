@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Building, Plus, CheckCircle, Clock, BookOpen } from 'lucide-react';
+import { Building, Plus, CheckCircle, Clock, BookOpen, User } from 'lucide-react';
+import { KERALA_DISTRICTS } from '../../data/districts';
 
 export const RPNewCentreForm = ({ onCentreCreated }) => {
   const { currentRp, courses, addCentre, showToast } = useApp();
@@ -24,10 +25,12 @@ export const RPNewCentreForm = ({ onCentreCreated }) => {
     committee_president_name: '',
     committee_president_phone: '',
     committee_secretary_name: '',
-    committee_secretary_phone: ''
+    committee_secretary_phone: '',
+    course_coordinator_name: '',
+    course_coordinator_phone: ''
   });
 
-  const districts = ['Malappuram', 'Kozhikode', 'Kannur', 'Thrissur', 'Palakkad', 'Wayanad', 'Kasaragod', 'Ernakulam', 'Kollam'];
+  const districts = KERALA_DISTRICTS;
 
   const selectedCourse = courses.find(c => c.id === selectedCourseId);
 
@@ -57,7 +60,9 @@ export const RPNewCentreForm = ({ onCentreCreated }) => {
       committee_president_name: '',
       committee_president_phone: '',
       committee_secretary_name: '',
-      committee_secretary_phone: ''
+      committee_secretary_phone: '',
+      course_coordinator_name: '',
+      course_coordinator_phone: ''
     });
 
     if (onCentreCreated) onCentreCreated();
@@ -225,6 +230,37 @@ export const RPNewCentreForm = ({ onCentreCreated }) => {
               placeholder="9847220033"
               value={formData.committee_secretary_phone}
               onChange={e => setFormData({ ...formData, committee_secretary_phone: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <hr style={{ border: 'none', borderTop: '1px solid var(--cpet-border)', margin: '1rem 0' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+          <h4 style={{ fontSize: '0.9rem', color: 'var(--cpet-primary)', margin: 0, fontWeight: 700 }}>
+            Course Coordinator (Among Students)
+          </h4>
+          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Assists with student communications & attendance</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+          <div className="form-group">
+            <label className="form-label">Coordinator Name</label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="e.g. Mohammed Salih"
+              value={formData.course_coordinator_name}
+              onChange={e => setFormData({ ...formData, course_coordinator_name: e.target.value })}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Coordinator Mobile No</label>
+            <input
+              type="tel"
+              className="form-input"
+              placeholder="e.g. 9846001122"
+              value={formData.course_coordinator_phone}
+              onChange={e => setFormData({ ...formData, course_coordinator_phone: e.target.value })}
             />
           </div>
         </div>

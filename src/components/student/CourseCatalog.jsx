@@ -123,9 +123,11 @@ export const CourseCatalog = ({ onSelectCourse }) => {
                       )}
                     </div>
 
-                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--cpet-primary)' }}>
-                      {course.standard_fee > 0 ? `₹${course.standard_fee.toLocaleString('en-IN')}` : 'FREE'}
-                    </span>
+                    {course.category !== 'MAHALLU' && (
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--cpet-primary)' }}>
+                        {course.standard_fee > 0 ? `₹${course.standard_fee.toLocaleString('en-IN')}` : 'FREE'}
+                      </span>
+                    )}
                   </div>
 
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: isBlocked ? '#475569' : 'var(--cpet-primary)', marginBottom: '0.4rem', lineHeight: 1.3 }}>
@@ -138,7 +140,7 @@ export const CourseCatalog = ({ onSelectCourse }) => {
                   <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.78rem', color: '#475569', marginBottom: '1rem', padding: '0.6rem 0.8rem', background: '#f8fafc', borderRadius: 'var(--radius-md)' }}>
                     <span>📅 <strong>{course.total_planned_classes} Sessions</strong></span>
                     <span>🎓 <strong>{course.evaluation_type.replace('_', ' ')}</strong></span>
-                    {course.payment_policy && (
+                    {course.category !== 'MAHALLU' && course.payment_policy && (
                       <span>💳 <strong>{course.payment_policy.replace(/_/g, ' ')}</strong></span>
                     )}
                   </div>

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { MapPin, Phone, UserCheck, Plus, CheckCircle, Clock, Building, User } from 'lucide-react';
+import { MapPin, Phone, UserCheck, Plus, CheckCircle, Clock, Building, User, Edit2, Trash2 } from 'lucide-react';
+import { KERALA_DISTRICTS } from '../../data/districts';
 
 export const CentresManager = () => {
-  const { centres, courses, resourcePersons, addCentre, updateCentreStatus, assignRpToCentre, enrollments, showToast } = useApp();
+  const { centres, courses, resourcePersons, addCentre, updateCentre, deleteCentre, updateCentreStatus, assignRpToCentre, enrollments, showToast } = useApp();
   const [filterDistrict, setFilterDistrict] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [showModal, setShowModal] = useState(false);
+  const [editingCentre, setEditingCentre] = useState(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -20,11 +22,30 @@ export const CentresManager = () => {
     committee_president_phone: '',
     committee_secretary_name: '',
     committee_secretary_phone: '',
+    course_coordinator_name: '',
+    course_coordinator_phone: '',
     assigned_rp_id: resourcePersons[0]?.id || '',
     active_course_id: courses.find(c => c.category === 'MAHALLU')?.id || courses[0]?.id || ''
   });
 
-  const districts = ['All', 'Malappuram', 'Kozhikode', 'Kannur', 'Thrissur', 'Palakkad', 'Wayanad', 'Kasaragod', 'Ernakulam', 'Kollam'];
+  const [editFormData, setEditFormData] = useState({
+    centre_name: '',
+    place: '',
+    mahallu_name: '',
+    panchayath_municipality: '',
+    district: 'Malappuram',
+    pincode: '',
+    committee_president_name: '',
+    committee_president_phone: '',
+    committee_secretary_name: '',
+    committee_secretary_phone: '',
+    course_coordinator_name: '',
+    course_coordinator_phone: '',
+    assigned_rp_id: '',
+    active_course_id: ''
+  });
+
+  const districts = ['All', ...KERALA_DISTRICTS];
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -52,9 +73,28 @@ export const CentresManager = () => {
       committee_president_phone: '',
       committee_secretary_name: '',
       committee_secretary_phone: '',
+      course_coordinator_name: '',
+      course_coordinator_phone: '',
       assigned_rp_id: resourcePersons[0]?.id || '',
       active_course_id: courses.find(c => c.category === 'MAHALLU')?.id || courses[0]?.id || ''
     });
+  };
+
+  const handleEditSubmit = (e) => {
+    e.preventDefault();
+    if (!editFormData.centre_name || !editFormData.place || !editFormData.district) {
+      showToast('Please fill all mandatory centre fields', 'danger');
+      return;
+    }
+
+    updateCentre(editingCentre.id, {
+      ...editFormData,
+      course_ids: editFormData.active_course_id
+        ? Array.from(new Set([...(editingCentre.course_ids || []), editFormData.active_course_id]))
+        : editingCentre.course_ids
+    });
+
+    setEditingCentre(null);
   };
 
   const filteredCentres = centres.filter(c => {
@@ -174,18 +214,24 @@ export const CentresManager = () => {
                   </div>
                 </div>
 
-                {/* Committee Contacts */}
+                {/* Committee & Coordinator Contacts */}
                 <div style={{ fontSize: '0.82rem', marginBottom: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <span style={{ color: '#64748b' }}>President:</span>
                     <span style={{ fontWeight: 600 }}>
-                      {centre.committee_president_name} ({centre.committee_president_phone})
+                      {centre.committee_president_name ? `${centre.committee_president_name} (${centre.committee_president_phone || '—'})` : (centre.committee_president_phone || '—')}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <span style={{ color: '#64748b' }}>Secretary:</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {centre.committee_secretary_name ? `${centre.committee_secretary_name} (${centre.committee_secretary_phone || '—'})` : (centre.committee_secretary_phone || '—')}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b' }}>Secretary:</span>
-                    <span style={{ fontWeight: 600 }}>
-                      {centre.committee_secretary_name} ({centre.committee_secretary_phone})
+                    <span style={{ color: '#64748b' }}>Coordinator:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--cpet-primary)' }}>
+                      {centre.course_coordinator_name ? `${centre.course_coordinator_name} (${centre.course_coordinator_phone || '—'})` : (centre.course_coordinator_phone || '—')}
                     </span>
                   </div>
                 </div>
@@ -207,19 +253,59 @@ export const CentresManager = () => {
                     ))}
                   </select>
                 </div>
-              </div>
 
-              {/* Action buttons */}
-              {centre.status === 'PENDING_APPROVAL' && (
-                <div style={{ paddingTop: '0.5rem', borderTop: '1px solid var(--cpet-border)' }}>
+                {/* Action buttons: Edit, Delete, Approve */}
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--cpet-border)' }}>
                   <button
-                    className="btn btn-success btn-sm btn-block"
-                    onClick={() => updateCentreStatus(centre.id, 'ACTIVE')}
+                    className="btn btn-secondary btn-sm"
+                    style={{ flex: 1 }}
+                    onClick={() => {
+                      setEditingCentre(centre);
+                      setEditFormData({
+                        centre_name: centre.centre_name || '',
+                        place: centre.place || '',
+                        mahallu_name: centre.mahallu_name || '',
+                        panchayath_municipality: centre.panchayath_municipality || '',
+                        district: centre.district || 'Malappuram',
+                        pincode: centre.pincode || '',
+                        committee_president_name: centre.committee_president_name || '',
+                        committee_president_phone: centre.committee_president_phone || '',
+                        committee_secretary_name: centre.committee_secretary_name || '',
+                        committee_secretary_phone: centre.committee_secretary_phone || '',
+                        course_coordinator_name: centre.course_coordinator_name || '',
+                        course_coordinator_phone: centre.course_coordinator_phone || '',
+                        assigned_rp_id: centre.assigned_rp_id || '',
+                        active_course_id: centre.active_course_id || (centre.course_ids?.[0] || '')
+                      });
+                    }}
                   >
-                    <CheckCircle size={14} /> Approve & Activate Centre
+                    <Edit2 size={13} /> Edit
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ color: '#dc2626' }}
+                    title="Delete Study Centre"
+                    onClick={() => {
+                      if (window.confirm(`Are you sure you want to delete "${centre.centre_name}"? All associated data will be removed.`)) {
+                        deleteCentre(centre.id);
+                      }
+                    }}
+                  >
+                    <Trash2 size={13} />
                   </button>
                 </div>
-              )}
+
+                {centre.status === 'PENDING_APPROVAL' && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <button
+                      className="btn btn-success btn-sm btn-block"
+                      onClick={() => updateCentreStatus(centre.id, 'ACTIVE')}
+                    >
+                      <CheckCircle size={14} /> Approve & Activate Centre
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
@@ -349,6 +435,37 @@ export const CentresManager = () => {
                 </div>
 
                 <hr style={{ border: 'none', borderTop: '1px solid var(--cpet-border)', margin: '1rem 0' }} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <h4 style={{ fontSize: '0.9rem', color: 'var(--cpet-primary)', margin: 0, fontWeight: 700 }}>
+                    Course Coordinator (Among Students)
+                  </h4>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Assists with student communications & attendance</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Coordinator Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. Mohammed Salih"
+                      value={formData.course_coordinator_name}
+                      onChange={e => setFormData({ ...formData, course_coordinator_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Coordinator Mobile No</label>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      placeholder="e.g. 9846001122"
+                      value={formData.course_coordinator_phone}
+                      onChange={e => setFormData({ ...formData, course_coordinator_phone: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <hr style={{ border: 'none', borderTop: '1px solid var(--cpet-border)', margin: '1rem 0' }} />
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group">
@@ -384,6 +501,195 @@ export const CentresManager = () => {
                 </button>
                 <button type="submit" className="btn btn-primary">
                   Save Study Centre
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Centre Modal */}
+      {editingCentre && (
+        <div className="modal-overlay" onClick={() => setEditingCentre(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Edit Study Centre Details</h3>
+              <button className="modal-close-btn" onClick={() => setEditingCentre(null)}>✕</button>
+            </div>
+
+            <form onSubmit={handleEditSubmit}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">Centre Name <span className="required">*</span></label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    required
+                    value={editFormData.centre_name}
+                    onChange={e => setEditFormData({ ...editFormData, centre_name: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Place / Town <span className="required">*</span></label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      required
+                      value={editFormData.place}
+                      onChange={e => setEditFormData({ ...editFormData, place: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Mahallu Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editFormData.mahallu_name}
+                      onChange={e => setEditFormData({ ...editFormData, mahallu_name: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">District <span className="required">*</span></label>
+                    <select
+                      className="form-select"
+                      required
+                      value={editFormData.district}
+                      onChange={e => setEditFormData({ ...editFormData, district: e.target.value })}
+                    >
+                      {districts.filter(d => d !== 'All').map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Pincode</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editFormData.pincode}
+                      onChange={e => setEditFormData({ ...editFormData, pincode: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <hr style={{ border: 'none', borderTop: '1px solid var(--cpet-border)', margin: '1rem 0' }} />
+                <h4 style={{ fontSize: '0.9rem', color: 'var(--cpet-primary)', marginBottom: '0.75rem', fontWeight: 700 }}>
+                  Mahallu Committee Office Bearers
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">President Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editFormData.committee_president_name}
+                      onChange={e => setEditFormData({ ...editFormData, committee_president_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">President Phone</label>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      value={editFormData.committee_president_phone}
+                      onChange={e => setEditFormData({ ...editFormData, committee_president_phone: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Secretary Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editFormData.committee_secretary_name}
+                      onChange={e => setEditFormData({ ...editFormData, committee_secretary_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Secretary Phone</label>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      value={editFormData.committee_secretary_phone}
+                      onChange={e => setEditFormData({ ...editFormData, committee_secretary_phone: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <hr style={{ border: 'none', borderTop: '1px solid var(--cpet-border)', margin: '1rem 0' }} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <h4 style={{ fontSize: '0.9rem', color: 'var(--cpet-primary)', margin: 0, fontWeight: 700 }}>
+                    Course Coordinator (Among Students)
+                  </h4>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Assists with student communications & attendance</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Coordinator Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editFormData.course_coordinator_name}
+                      onChange={e => setEditFormData({ ...editFormData, course_coordinator_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Coordinator Mobile No</label>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      value={editFormData.course_coordinator_phone}
+                      onChange={e => setEditFormData({ ...editFormData, course_coordinator_phone: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <hr style={{ border: 'none', borderTop: '1px solid var(--cpet-border)', margin: '1rem 0' }} />
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Assign Resource Person</label>
+                    <select
+                      className="form-select"
+                      value={editFormData.assigned_rp_id}
+                      onChange={e => setEditFormData({ ...editFormData, assigned_rp_id: e.target.value })}
+                    >
+                      <option value="">-- No Teacher Assigned --</option>
+                      {resourcePersons.map(rp => (
+                        <option key={rp.id} value={rp.id}>{rp.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Active Course</label>
+                    <select
+                      className="form-select"
+                      value={editFormData.active_course_id}
+                      onChange={e => setEditFormData({ ...editFormData, active_course_id: e.target.value })}
+                    >
+                      {courses.map(c => (
+                        <option key={c.id} value={c.id}>{c.title} ({c.course_code})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setEditingCentre(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Update Study Centre
                 </button>
               </div>
             </form>

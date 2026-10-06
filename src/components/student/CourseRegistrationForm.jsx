@@ -169,7 +169,9 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
         <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0.2rem 0' }}>{course.title}</h2>
         <p style={{ fontSize: '0.85rem', opacity: 0.9, margin: 0 }}>{course.description}</p>
         <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', fontSize: '0.82rem', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '0.5rem' }}>
-          <span>Fee: <strong>{course.standard_fee > 0 ? `₹${course.standard_fee}` : 'FREE'}</strong></span>
+          {!isMahallu && (
+            <span>Fee: <strong>{course.standard_fee > 0 ? `₹${course.standard_fee}` : 'FREE'}</strong></span>
+          )}
           <span>Classes: <strong>{course.total_planned_classes} Sessions</strong></span>
           <span>Mode: <strong>{course.evaluation_type.replace('_', ' ')}</strong></span>
         </div>
@@ -523,56 +525,64 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
           )}
 
           {/* Payment Section based on Course Policy */}
-          {course.standard_fee > 0 && (
-            <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--cpet-border)', marginBottom: '1.5rem' }}>
-              <h4 style={{ color: 'var(--cpet-primary)', marginBottom: '0.4rem', fontWeight: 800 }}>
-                Course Fee: ₹{course.standard_fee.toLocaleString('en-IN')}
-              </h4>
-
-              {course.payment_policy === 'PAY_AT_REGISTRATION' && (
-                <div>
-                  <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '0.75rem' }}>
-                    Please transfer the course fee to the CPET Bank Account or scan our UPI QR code and enter the UTR/Reference number below:
-                  </p>
-                  <div style={{ background: 'white', padding: '0.75rem', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '0.75rem', border: '1px solid #e2e8f0' }}>
-                    <div>Account: <strong>CPET Darul Huda Islamic University</strong></div>
-                    <div>Bank: <strong>SBI Chemmad Branch</strong> | IFSC: <strong>SBIN0070188</strong></div>
-                    <div>UPI ID: <strong>cpet@sbi</strong></div>
-                  </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Payment UTR / Transaction Ref No <span className="required">*</span></label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      required
-                      placeholder="e.g. 492810482910"
-                      value={paymentUtr}
-                      onChange={e => setPaymentUtr(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {course.payment_policy === 'COLLECTED_BY_RP' && (
-                <div style={{ background: '#ecfdf5', padding: '0.85rem', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
-                  <p style={{ fontSize: '0.85rem', color: '#065f46', margin: 0, fontWeight: 600 }}>
-                    🤝 <strong>Fee Collected by Resource Person:</strong> You do not need to pay online now. The course fee of ₹{course.standard_fee} will be collected in person by your assigned Resource Person / Mahallu Study Centre coordinator.
-                  </p>
-                </div>
-              )}
-
-              {course.payment_policy === 'PAY_AFTER_CONFIRMATION' && (
-                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
-                  ℹ️ <strong>Pay on Confirmation:</strong> Your application will be reviewed by the CPET admissions team. We will contact you via WhatsApp / Phone to confirm your seat before collecting fees.
-                </p>
-              )}
-
-              {course.payment_policy === 'PAY_ON_SPOT' && (
-                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
-                  ℹ️ <strong>Pay on Spot:</strong> You can pay the registration fee of ₹{course.standard_fee} in cash or UPI at the entrance reception desk on the day of the event.
-                </p>
-              )}
+          {isMahallu ? (
+            <div style={{ background: '#ecfdf5', padding: '0.9rem', borderRadius: 'var(--radius-md)', border: '1px solid #a7f3d0', marginBottom: '1.5rem' }}>
+              <p style={{ fontSize: '0.85rem', color: '#065f46', margin: 0, fontWeight: 600 }}>
+                🤝 <strong>Fee Collected at Study Centre:</strong> The course fee will be collected directly at your Mahallu study centre by the course coordinator / Resource Person.
+              </p>
             </div>
+          ) : (
+            course.standard_fee > 0 && (
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--cpet-border)', marginBottom: '1.5rem' }}>
+                <h4 style={{ color: 'var(--cpet-primary)', marginBottom: '0.4rem', fontWeight: 800 }}>
+                  Course Fee: ₹{course.standard_fee.toLocaleString('en-IN')}
+                </h4>
+
+                {course.payment_policy === 'PAY_AT_REGISTRATION' && (
+                  <div>
+                    <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '0.75rem' }}>
+                      Please transfer the course fee to the CPET Bank Account or scan our UPI QR code and enter the UTR/Reference number below:
+                    </p>
+                    <div style={{ background: 'white', padding: '0.75rem', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '0.75rem', border: '1px solid #e2e8f0' }}>
+                      <div>Account: <strong>CPET Darul Huda Islamic University</strong></div>
+                      <div>Bank: <strong>SBI Chemmad Branch</strong> | IFSC: <strong>SBIN0070188</strong></div>
+                      <div>UPI ID: <strong>cpet@sbi</strong></div>
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Payment UTR / Transaction Ref No <span className="required">*</span></label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        required
+                        placeholder="e.g. 492810482910"
+                        value={paymentUtr}
+                        onChange={e => setPaymentUtr(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {course.payment_policy === 'COLLECTED_BY_RP' && (
+                  <div style={{ background: '#ecfdf5', padding: '0.85rem', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                    <p style={{ fontSize: '0.85rem', color: '#065f46', margin: 0, fontWeight: 600 }}>
+                      🤝 <strong>Fee Collected by Resource Person:</strong> You do not need to pay online now. The course fee will be collected in person by your assigned Resource Person / Mahallu Study Centre coordinator.
+                    </p>
+                  </div>
+                )}
+
+                {course.payment_policy === 'PAY_AFTER_CONFIRMATION' && (
+                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
+                    ℹ️ <strong>Pay on Confirmation:</strong> Your application will be reviewed by the CPET admissions team. We will contact you via WhatsApp / Phone to confirm your seat before collecting fees.
+                  </p>
+                )}
+
+                {course.payment_policy === 'PAY_ON_SPOT' && (
+                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
+                    ℹ️ <strong>Pay on Spot:</strong> You can pay the registration fee of ₹{course.standard_fee} in cash or UPI at the entrance reception desk on the day of the event.
+                  </p>
+                )}
+              </div>
+            )
           )}
 
           <button

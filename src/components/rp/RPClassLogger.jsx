@@ -1,77 +1,131 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Plus, CheckCircle, Clock, Calendar, BookOpen, MapPin, DollarSign } from 'lucide-react';
+import { Plus, CheckCircle, Clock, Calendar, BookOpen, MapPin, Edit2, Trash2 } from 'lucide-react';
 
 export const RPClassLogger = () => {
-  const { currentRp, centres, courses, classLogs, addClassLog, showToast } = useApp();
+  const { currentRp, centres, courses, classLogs, addClassLog, updateClassLog, deleteClassLog, showToast } = useApp();
   const [showLogModal, setShowLogModal] = useState(false);
-
-  // RP's assigned centres
-  const assignedCentres = centres.filter(c => c.assigned_rp_id === currentRp.id);
-  const rpLogs = classLogs.filter(l => l.rp_id === currentRp.id);
+  const [editingLog, setEditingLog] = useState(null);
 
   const initialCourseId = courses[0]?.id || '';
   const initialCentresForCourse = centres.filter(c => {
-    if (!initialCourseId) return true;
-    const isDirect = c.active_course_id === initialCourseId;
-    const inList = Array.isArray(c.course_ids) && c.course_ids.includes(initialCourseId);
-    return isDirect || inList;
+    if (!initialCourseId) return false;
+    return c.active_course_id === initialCourseId || (Array.isArray(c.course_ids) && c.course_ids.includes(initialCourseId));
   });
 
-  // Form State
+  // Form State for Adding
   const [formData, setFormData] = useState({
     course_id: initialCourseId,
-    centre_id: initialCentresForCourse[0]?.id || assignedCentres[0]?.id || centres[0]?.id || '',
+    centre_id: initialCentresForCourse[0]?.id || '',
     class_date: new Date().toISOString().split('T')[0],
     session_type: 'REGULAR_CLASS',
     hours_spent: 2.0,
-    syllabus_covered: '',
-    travel_allowance: 0
+    syllabus_covered: ''
   });
 
-  // Calculate centres running the currently selected course in form
-  const availableCentresForCourse = centres.filter(c => {
-    if (!formData.course_id) return true;
-    const isDirect = c.active_course_id === formData.course_id;
-    const inList = Array.isArray(c.course_ids) && c.course_ids.includes(formData.course_id);
-    return isDirect || inList;
+  // Form State for Editing
+  const [editFormData, setEditFormData] = useState({
+    course_id: '',
+    centre_id: '',
+    class_date: '',
+    session_type: 'REGULAR_CLASS',
+    hours_spent: 2.0,
+    syllabus_covered: ''
   });
 
-  const displayedCentres = availableCentresForCourse.length > 0 ? availableCentresForCourse : centres;
+  // Calculate centres running the currently selected course in Add form
+  const availableCentresForAdd = formData.course_id
+    ? centres.filter(c => c.active_course_id === formData.course_id || (Array.isArray(c.course_ids) && c.course_ids.includes(formData.course_id)))
+    : [];
+
+  // Calculate centres running the currently selected course in Edit form
+  const availableCentresForEdit = editFormData.course_id
+    ? centres.filter(c => c.active_course_id === editFormData.course_id || (Array.isArray(c.course_ids) && c.course_ids.includes(editFormData.course_id)))
+    : [];
 
   const handleCourseChange = (newCourseId) => {
     const matchingCentres = centres.filter(c => {
-      const isDirect = c.active_course_id === newCourseId;
-      const inList = Array.isArray(c.course_ids) && c.course_ids.includes(newCourseId);
-      return isDirect || inList;
+      return c.active_course_id === newCourseId || (Array.isArray(c.course_ids) && c.course_ids.includes(newCourseId));
     });
 
     setFormData(prev => ({
       ...prev,
       course_id: newCourseId,
-      centre_id: matchingCentres[0]?.id || (prev.centre_id && centres.some(c => c.id === prev.centre_id) ? prev.centre_id : centres[0]?.id || '')
+      centre_id: matchingCentres[0]?.id || ''
+    }));
+  };
+
+  const handleEditCourseChange = (newCourseId) => {
+    const matchingCentres = centres.filter(c => {
+      return c.active_course_id === newCourseId || (Array.isArray(c.course_ids) && c.course_ids.includes(newCourseId));
+    });
+
+    setEditFormData(prev => ({
+      ...prev,
+      course_id: newCourseId,
+      centre_id: matchingCentres[0]?.id || ''
     }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.course_id || !formData.centre_id || !formData.syllabus_covered) {
-      showToast('Please select course, centre, and topic covered', 'danger');
+      showToast('Please select course, study centre, and syllabus covered', 'danger');
       return;
     }
 
-    addClassLog(formData);
+    addClassLog({
+      ...formData,
+      travel_allowance: 0
+    });
     setShowLogModal(false);
+
+    const defaultCrsId = courses[0]?.id || '';
+    const defCentres = centres.filter(c => c.active_course_id === defaultCrsId || (Array.isArray(c.course_ids) && c.course_ids.includes(defaultCrsId)));
     setFormData({
-      course_id: courses[0]?.id || '',
-      centre_id: initialCentresForCourse[0]?.id || assignedCentres[0]?.id || centres[0]?.id || '',
+      course_id: defaultCrsId,
+      centre_id: defCentres[0]?.id || '',
       class_date: new Date().toISOString().split('T')[0],
       session_type: 'REGULAR_CLASS',
       hours_spent: 2.0,
-      syllabus_covered: '',
-      travel_allowance: 0
+      syllabus_covered: ''
     });
   };
+
+  const handleStartEdit = (log) => {
+    setEditingLog(log);
+    setEditFormData({
+      course_id: log.course_id || '',
+      centre_id: log.centre_id || '',
+      class_date: log.class_date || new Date().toISOString().split('T')[0],
+      session_type: log.session_type || 'REGULAR_CLASS',
+      hours_spent: log.hours_spent || 2.0,
+      syllabus_covered: log.syllabus_covered || ''
+    });
+  };
+
+  const handleEditSubmit = (e) => {
+    e.preventDefault();
+    if (!editFormData.course_id || !editFormData.centre_id || !editFormData.syllabus_covered) {
+      showToast('Please select course, study centre, and syllabus covered', 'danger');
+      return;
+    }
+
+    updateClassLog(editingLog.id, {
+      ...editFormData,
+      travel_allowance: 0
+    });
+    setEditingLog(null);
+  };
+
+  // Filter logs for this RP and sort newest on top
+  const rpLogs = classLogs.filter(l => l.rp_id === currentRp.id);
+  const sortedLogs = [...rpLogs].sort((a, b) => {
+    if (b.class_date !== a.class_date) {
+      return (b.class_date || '').localeCompare(a.class_date || '');
+    }
+    return (b.id || '').localeCompare(a.id || '');
+  });
 
   return (
     <div>
@@ -82,7 +136,7 @@ export const RPClassLogger = () => {
             Class Log & Remuneration Claims
           </h3>
           <p className="cpet-card-desc">
-            Replaces WhatsApp group reporting. Log your classes in 1 minute to calculate and verify monthly remuneration.
+            Log your classes in 1 minute to record sessions and calculate monthly remuneration claims.
           </p>
         </div>
         <button className="btn btn-accent" onClick={() => setShowLogModal(true)}>
@@ -91,14 +145,14 @@ export const RPClassLogger = () => {
         </button>
       </div>
 
-      {/* Recent Logs List (Mobile Optimized) */}
+      {/* Recent Logs List (Newest on Top) */}
       <div className="mobile-card-list">
-        {rpLogs.length === 0 ? (
+        {sortedLogs.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '2.5rem', background: 'white', borderRadius: 'var(--radius-lg)', border: '1px solid var(--cpet-border)', color: '#64748b' }}>
             No class logs recorded yet. Tap "Log Class Taken" after conducting a session.
           </div>
         ) : (
-          rpLogs.map(log => (
+          sortedLogs.map(log => (
             <div key={log.id} className="mobile-data-card">
               <div className="card-top">
                 <div>
@@ -126,9 +180,6 @@ export const RPClassLogger = () => {
                 </div>
                 <div className="card-meta-item" style={{ marginLeft: 'auto', fontWeight: 700, color: 'var(--cpet-primary)' }}>
                   <span>Claim: ₹{log.total_claim}</span>
-                  {log.travel_allowance > 0 && (
-                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}> (incl. ₹{log.travel_allowance} TA)</span>
-                  )}
                 </div>
               </div>
 
@@ -137,12 +188,34 @@ export const RPClassLogger = () => {
                   Office Note: {log.admin_notes}
                 </div>
               )}
+
+              {/* Action Buttons: Edit and Delete */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9', justifyContent: 'flex-end' }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                  onClick={() => handleStartEdit(log)}
+                >
+                  <Edit2 size={12} /> Edit
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', color: '#dc2626' }}
+                  onClick={() => {
+                    if (window.confirm(`Delete class log for "${log.centre_name}" on ${log.class_date}?`)) {
+                      deleteClassLog(log.id);
+                    }
+                  }}
+                >
+                  <Trash2 size={12} /> Delete
+                </button>
+              </div>
             </div>
           ))
         )}
       </div>
 
-      {/* 1-Minute Class Log Modal / Bottom Sheet */}
+      {/* 1-Minute Class Log Modal / Add */}
       {showLogModal && (
         <div className="modal-overlay" onClick={() => setShowLogModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -180,32 +253,26 @@ export const RPClassLogger = () => {
                   <select
                     className="form-select"
                     required
+                    disabled={!formData.course_id}
                     value={formData.centre_id}
                     onChange={e => setFormData({ ...formData, centre_id: e.target.value })}
                     style={{ fontWeight: 600 }}
                   >
-                    <option value="">-- Select Study Centre --</option>
-                    {availableCentresForCourse.length > 0 && (
-                      <optgroup label="Centres Offering this Course">
-                        {availableCentresForCourse.map(c => (
-                          <option key={c.id} value={c.id}>
-                            ★ {c.centre_name} ({c.place}, {c.district})
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                    <optgroup label={availableCentresForCourse.length > 0 ? "All Other Registered Study Centres" : "All Registered Study Centres"}>
-                      {centres
-                        .filter(c => !availableCentresForCourse.some(m => m.id === c.id))
-                        .map(c => (
-                          <option key={c.id} value={c.id}>
-                            {c.centre_name} ({c.place}, {c.district})
-                          </option>
-                        ))}
-                    </optgroup>
+                    <option value="">
+                      {!formData.course_id
+                        ? '-- Please Select Course First --'
+                        : availableCentresForAdd.length === 0
+                        ? '-- No Centres Registered for this Course --'
+                        : '-- Select Study Centre --'}
+                    </option>
+                    {availableCentresForAdd.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.centre_name} ({c.place}, {c.district})
+                      </option>
+                    ))}
                   </select>
                   <span className="form-helper">
-                    All study centres in the CPET network are available for any visiting Resource Person to log classes.
+                    Only centres registered for the selected course are displayed.
                   </span>
                 </div>
 
@@ -235,27 +302,15 @@ export const RPClassLogger = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <div className="form-group">
-                    <label className="form-label">Duration (Hours)</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      className="form-input"
-                      value={formData.hours_spent}
-                      onChange={e => setFormData({ ...formData, hours_spent: Number(e.target.value) })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Travel Claim (₹)</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      placeholder="e.g. 200"
-                      value={formData.travel_allowance}
-                      onChange={e => setFormData({ ...formData, travel_allowance: Number(e.target.value) })}
-                    />
-                  </div>
+                <div className="form-group">
+                  <label className="form-label">Duration (Hours)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    className="form-input"
+                    value={formData.hours_spent}
+                    onChange={e => setFormData({ ...formData, hours_spent: Number(e.target.value) })}
+                  />
                 </div>
 
                 <div className="form-group">
@@ -277,6 +332,127 @@ export const RPClassLogger = () => {
                 </button>
                 <button type="submit" className="btn btn-accent">
                   <CheckCircle size={16} /> Submit Class Log
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Class Log Modal */}
+      {editingLog && (
+        <div className="modal-overlay" onClick={() => setEditingLog(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Edit Class Log</h3>
+              <button className="modal-close-btn" onClick={() => setEditingLog(null)}>✕</button>
+            </div>
+
+            <form onSubmit={handleEditSubmit}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                    1. Course / Program <span className="required">*</span>
+                  </label>
+                  <select
+                    className="form-select"
+                    required
+                    value={editFormData.course_id}
+                    onChange={e => handleEditCourseChange(e.target.value)}
+                    style={{ fontWeight: 600 }}
+                  >
+                    <option value="">-- Select Course --</option>
+                    {courses.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.title} ({c.course_code}) [{c.category?.replace('_', ' ')}]
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                    2. Study Centre <span className="required">*</span>
+                  </label>
+                  <select
+                    className="form-select"
+                    required
+                    disabled={!editFormData.course_id}
+                    value={editFormData.centre_id}
+                    onChange={e => setEditFormData({ ...editFormData, centre_id: e.target.value })}
+                    style={{ fontWeight: 600 }}
+                  >
+                    <option value="">
+                      {!editFormData.course_id
+                        ? '-- Please Select Course First --'
+                        : availableCentresForEdit.length === 0
+                        ? '-- No Centres Registered for this Course --'
+                        : '-- Select Study Centre --'}
+                    </option>
+                    {availableCentresForEdit.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.centre_name} ({c.place}, {c.district})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Class Date <span className="required">*</span></label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      required
+                      value={editFormData.class_date}
+                      onChange={e => setEditFormData({ ...editFormData, class_date: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Session Type</label>
+                    <select
+                      className="form-select"
+                      value={editFormData.session_type}
+                      onChange={e => setEditFormData({ ...editFormData, session_type: e.target.value })}
+                    >
+                      <option value="REGULAR_CLASS">Regular Class</option>
+                      <option value="SPECIAL_CLASS">Special Class</option>
+                      <option value="EXAM">Exam / Assessment</option>
+                      <option value="ORIENTATION">Orientation Session</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Duration (Hours)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    className="form-input"
+                    value={editFormData.hours_spent}
+                    onChange={e => setEditFormData({ ...editFormData, hours_spent: Number(e.target.value) })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Syllabus / Chapter Covered <span className="required">*</span></label>
+                  <textarea
+                    className="form-textarea"
+                    rows="2"
+                    required
+                    placeholder="Briefly state topics taught or chapters covered..."
+                    value={editFormData.syllabus_covered}
+                    onChange={e => setEditFormData({ ...editFormData, syllabus_covered: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setEditingLog(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Update Class Log
                 </button>
               </div>
             </form>
