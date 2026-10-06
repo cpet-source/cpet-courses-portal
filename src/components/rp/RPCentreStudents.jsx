@@ -78,7 +78,6 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
   const [showAttachCentreModal, setShowAttachCentreModal] = useState(false);
-  const [selectedStudentForMarks, setSelectedStudentForMarks] = useState(null);
 
   // Add Student Modal Chained State
   const [modalCourseId, setModalCourseId] = useState(selectedCourseId || availableCourses[0]?.id || '');
@@ -545,104 +544,21 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
                       </div>
                     </div>
 
-                    {/* Quick Touch Actions */}
-                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9' }}>
-                      {/* Attendance Tap */}
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        style={{ flex: 1 }}
-                        onClick={() => markStudentAttendance(student.id)}
-                        title="Increment attended classes"
-                      >
-                        +1 Attendance
-                      </button>
-
-                      {/* Fee Collection Tap */}
-                      {!isFeePaid && (
+                    {/* Fee Collection Action (if unpaid) */}
+                    {!isFeePaid && (
+                      <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9' }}>
                         <button
-                          className="btn btn-primary btn-sm"
+                          className="btn btn-primary btn-sm btn-block"
                           onClick={() => updateStudentFee(student.id, 'PAID_TO_RP', selectedCourse.standard_fee)}
                         >
-                          <DollarSign size={13} /> Collect ₹{selectedCourse.standard_fee}
+                          <DollarSign size={13} /> Collect Fee (₹{selectedCourse.standard_fee})
                         </button>
-                      )}
-
-                      {/* Marks Entry Modal Trigger */}
-                      <button
-                        className="btn btn-outline btn-sm"
-                        onClick={() => setSelectedStudentForMarks(student)}
-                      >
-                        <Award size={13} /> Enter Marks
-                      </button>
-                    </div>
+                      </div>
+                    )}
                   </div>
                 );
               })
             )}
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 1: Enter Subject Marks */}
-      {selectedStudentForMarks && (
-        <div className="modal-overlay" onClick={() => setSelectedStudentForMarks(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <h3>Subject Marks Entry</h3>
-                <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
-                  Student: <strong>{selectedStudentForMarks.student_name}</strong> (Adm: {selectedStudentForMarks.admission_number})
-                </p>
-              </div>
-              <button className="modal-close-btn" onClick={() => setSelectedStudentForMarks(null)}>✕</button>
-            </div>
-
-            <div className="modal-body">
-              {(!selectedCourse?.subjects || selectedCourse.subjects.length === 0) ? (
-                <div style={{ textAlign: 'center', padding: '1.5rem', color: '#64748b' }}>
-                  This course is evaluated by attendance only. No exam subjects configured.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {selectedCourse.subjects.map(subject => {
-                    const currentMark = selectedStudentForMarks.marks?.[subject.id] || '';
-
-                    return (
-                      <div key={subject.id} style={{ background: '#f8fafc', border: '1px solid var(--cpet-border)', borderRadius: 'var(--radius-md)', padding: '0.85rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                          <strong style={{ color: 'var(--cpet-primary)' }}>{subject.name}</strong>
-                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                            Pass: {subject.pass_marks} / Max: {subject.max_marks}
-                          </span>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <input
-                            type="number"
-                            className="form-input"
-                            style={{ maxWidth: '120px', fontWeight: 700, fontSize: '1.1rem' }}
-                            placeholder="Score"
-                            defaultValue={currentMark}
-                            onBlur={(e) => {
-                              if (e.target.value !== '') {
-                                updateStudentMarks(selectedStudentForMarks.id, subject.id, e.target.value);
-                              }
-                            }}
-                          />
-                          <span style={{ fontSize: '0.85rem', color: '#64748b' }}>/ {subject.max_marks}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="modal-footer">
-              <button className="btn btn-primary" onClick={() => setSelectedStudentForMarks(null)}>
-                Done & Close
-              </button>
-            </div>
           </div>
         </div>
       )}
