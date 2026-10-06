@@ -98,13 +98,13 @@ export const CourseCatalog = ({ onSelectCourse }) => {
             return (
               <div key={course.id} className="cpet-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', overflow: 'hidden', border: isBlocked ? '1px solid #e2e8f0' : undefined }}>
                 <div>
-                  {/* Google Form Style 4:1 Compact Banner */}
+                  {/* 800x1600 (2:1) Landscape Banner */}
                   {course.poster_url ? (
                     <div style={{
                       width: 'calc(100% + 3rem)',
                       margin: '-1.5rem -1.5rem 1rem -1.5rem',
-                      aspectRatio: '4 / 1',
-                      maxHeight: '110px',
+                      aspectRatio: '2 / 1',
+                      maxHeight: '180px',
                       overflow: 'hidden',
                       background: '#0f172a'
                     }}>

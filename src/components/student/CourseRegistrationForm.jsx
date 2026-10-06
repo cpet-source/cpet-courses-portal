@@ -159,13 +159,13 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
 
   return (
     <div className="cpet-card" style={{ maxWidth: '680px', margin: '0 auto', overflow: 'hidden' }}>
-      {/* 400x1600 Google Form Style Header Banner */}
+      {/* 800x1600 (2:1) Landscape Header Banner */}
       {course.poster_url && (
         <div style={{
           width: 'calc(100% + 3rem)',
           margin: '-1.5rem -1.5rem 1.25rem -1.5rem',
-          aspectRatio: '4 / 1',
-          maxHeight: '170px',
+          aspectRatio: '2 / 1',
+          maxHeight: '340px',
           overflow: 'hidden',
           background: '#0f172a',
           borderBottom: '1px solid var(--cpet-border)'

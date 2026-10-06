@@ -339,8 +339,8 @@ export const CoursesManager = () => {
                 <div style={{
                   width: 'calc(100% + 3rem)',
                   margin: '-1.5rem -1.5rem 0.85rem -1.5rem',
-                  aspectRatio: '4 / 1',
-                  maxHeight: '90px',
+                  aspectRatio: '2 / 1',
+                  maxHeight: '160px',
                   overflow: 'hidden',
                   background: '#0f172a'
                 }}>
@@ -676,13 +676,13 @@ export const CoursesManager = () => {
                       <ImageIcon size={16} /> Course Poster Banner
                     </label>
                     <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                      Compact landscape banner (Google Form style, ~400×1600 px)
+                      Landscape banner (~800×1600 px, 2:1 ratio)
                     </span>
                   </div>
 
                   {formData.poster_url ? (
                     <div>
-                      <div style={{ width: '100%', aspectRatio: '4 / 1', maxHeight: '120px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #cbd5e1', marginBottom: '0.5rem', background: '#0f172a' }}>
+                      <div style={{ width: '100%', aspectRatio: '2 / 1', maxHeight: '180px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #cbd5e1', marginBottom: '0.5rem', background: '#0f172a' }}>
                         <img
                           src={formData.poster_url}
                           alt="Poster Preview"
