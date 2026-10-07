@@ -599,9 +599,11 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
                       <div>
                         <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>Exam Evaluation</span>
                         <strong>
-                          {totalSubjects > 0
-                            ? (gradedCount > 0 ? `${gradedCount}/${totalSubjects} Subjects Graded` : 'Pending Mark Entry')
-                            : 'Attendance-based'}
+                          {selectedCourse?.evaluation_type === 'NONE'
+                            ? 'No Exam / Open'
+                            : (totalSubjects > 0 && selectedCourse?.evaluation_type !== 'ATTENDANCE_ONLY'
+                                ? (gradedCount > 0 ? `${gradedCount}/${totalSubjects} Subjects Graded` : 'Pending Mark Entry')
+                                : 'Attendance-based')}
                         </strong>
                       </div>
                     </div>

@@ -113,7 +113,7 @@ export const RPNewCentreForm = ({ onCentreCreated }) => {
                 <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', fontSize: '0.78rem', color: '#64748b' }}>
                   <span>Syllabus: <strong>{selectedCourse.total_planned_classes} Classes</strong></span>
                   <span>•</span>
-                  <span>Evaluation: <strong>{selectedCourse.evaluation_type?.replace('_', ' ')}</strong></span>
+                  <span>Evaluation: <strong>{selectedCourse.evaluation_type === 'NONE' ? 'No Exam / Open' : selectedCourse.evaluation_type?.replace('_', ' ')}</strong></span>
                   <span>•</span>
                   <span>Fee: <strong>{selectedCourse.standard_fee > 0 ? `₹${selectedCourse.standard_fee}` : 'Free'}</strong></span>
                 </div>

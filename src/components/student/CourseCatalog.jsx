@@ -6,9 +6,44 @@ export const CourseCatalog = ({ onSelectCourse }) => {
   const { courses, showToast } = useApp();
   const [filterCategory, setFilterCategory] = useState('ALL');
 
+  const normalizeCategory = (cat) => {
+    if (cat === 'GENERAL_ONLINE') return 'ONLINE';
+    if (cat === 'GENERAL_OFFLINE') return 'OFFLINE_WORKSHOP';
+    return cat || 'MAHALLU';
+  };
+
+  const getCategoryLabel = (cat) => {
+    const norm = normalizeCategory(cat);
+    switch (norm) {
+      case 'MAHALLU': return 'Mahallu Based';
+      case 'ONLINE': return 'Online Course';
+      case 'OFFLINE_WORKSHOP': return 'Workshop / Camp';
+      case 'LANGUAGE_ACADEMY': return 'Language Academy';
+      default: return (cat || '').replace(/_/g, ' ');
+    }
+  };
+
+  const getCategoryBadgeClass = (cat) => {
+    const norm = normalizeCategory(cat);
+    switch (norm) {
+      case 'MAHALLU': return 'badge-primary';
+      case 'ONLINE': return 'badge-accent';
+      case 'OFFLINE_WORKSHOP': return 'badge-warning';
+      case 'LANGUAGE_ACADEMY': return 'badge-secondary';
+      default: return 'badge-neutral';
+    }
+  };
+
   const filtered = courses.filter(c => {
     if (filterCategory === 'ALL') return true;
-    return c.category === filterCategory;
+    return normalizeCategory(c.category) === filterCategory;
+  });
+
+  // Sort latest courses on top
+  const sortedCourses = [...filtered].sort((a, b) => {
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.id ? parseInt(a.id.replace(/\D/g, '') || 0) : 0);
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.id ? parseInt(b.id.replace(/\D/g, '') || 0) : 0);
+    return timeB - timeA;
   });
 
   return (
@@ -40,16 +75,22 @@ export const CourseCatalog = ({ onSelectCourse }) => {
           Mahallu Study Centres
         </button>
         <button
-          className={`tab-btn ${filterCategory === 'GENERAL_ONLINE' ? 'active' : ''}`}
-          onClick={() => setFilterCategory('GENERAL_ONLINE')}
+          className={`tab-btn ${filterCategory === 'ONLINE' ? 'active' : ''}`}
+          onClick={() => setFilterCategory('ONLINE')}
         >
-          Online Diplomas
+          Online Courses
         </button>
         <button
-          className={`tab-btn ${filterCategory === 'GENERAL_OFFLINE' ? 'active' : ''}`}
-          onClick={() => setFilterCategory('GENERAL_OFFLINE')}
+          className={`tab-btn ${filterCategory === 'OFFLINE_WORKSHOP' ? 'active' : ''}`}
+          onClick={() => setFilterCategory('OFFLINE_WORKSHOP')}
         >
           Workshops & Camps
+        </button>
+        <button
+          className={`tab-btn ${filterCategory === 'LANGUAGE_ACADEMY' ? 'active' : ''}`}
+          onClick={() => setFilterCategory('LANGUAGE_ACADEMY')}
+        >
+          Language Academy
         </button>
       </div>
 
@@ -75,7 +116,7 @@ export const CourseCatalog = ({ onSelectCourse }) => {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
-          {filtered.map(course => {
+          {sortedCourses.map(course => {
             const isClosed = course.registration_status === 'CLOSED';
             const isUpcoming = course.registration_status === 'UPCOMING';
 
@@ -120,11 +161,13 @@ export const CourseCatalog = ({ onSelectCourse }) => {
                       margin: '-1.5rem -1.5rem 1rem -1.5rem',
                       height: '55px',
                       overflow: 'hidden',
-                      background: course.category === 'MAHALLU'
-                        ? 'linear-gradient(135deg, #064e3b 0%, #047857 100%)'
-                        : course.category === 'GENERAL_ONLINE'
-                        ? 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)'
-                        : 'linear-gradient(135deg, #78350f 0%, #d97706 100%)',
+                      background: (() => {
+                        const norm = normalizeCategory(course.category);
+                        if (norm === 'MAHALLU') return 'linear-gradient(135deg, #064e3b 0%, #047857 100%)';
+                        if (norm === 'ONLINE') return 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)';
+                        if (norm === 'LANGUAGE_ACADEMY') return 'linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%)';
+                        return 'linear-gradient(135deg, #78350f 0%, #d97706 100%)';
+                      })(),
                       display: 'flex',
                       alignItems: 'center',
                       padding: '0 1.25rem'
@@ -137,11 +180,8 @@ export const CourseCatalog = ({ onSelectCourse }) => {
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.35rem' }}>
                     <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                      <span className={`badge ${
-                        course.category === 'MAHALLU' ? 'badge-primary' :
-                        course.category === 'GENERAL_ONLINE' ? 'badge-accent' : 'badge-warning'
-                      }`}>
-                        {course.category.replace('_', ' ')}
+                      <span className={`badge ${getCategoryBadgeClass(course.category)}`}>
+                        {getCategoryLabel(course.category)}
                       </span>
 
                       {/* Status & Deadline Badges */}
@@ -185,7 +225,7 @@ export const CourseCatalog = ({ onSelectCourse }) => {
 
                   <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.78rem', color: '#475569', marginBottom: '1rem', padding: '0.6rem 0.8rem', background: '#f8fafc', borderRadius: 'var(--radius-md)' }}>
                     <span>📅 <strong>{course.total_planned_classes} Sessions</strong></span>
-                    <span>🎓 <strong>{course.evaluation_type.replace('_', ' ')}</strong></span>
+                    <span>🎓 <strong>{course.evaluation_type === 'NONE' ? 'No Exam / Open' : course.evaluation_type.replace('_', ' ')}</strong></span>
                     {course.category !== 'MAHALLU' && course.payment_policy && (
                       <span>💳 <strong>{course.payment_policy.replace(/_/g, ' ')}</strong></span>
                     )}

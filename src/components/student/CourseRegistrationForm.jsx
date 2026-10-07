@@ -185,16 +185,20 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
       {/* Course Banner */}
       <div style={{ background: 'linear-gradient(135deg, var(--cpet-primary) 0%, var(--cpet-accent) 100%)', color: 'white', padding: '1.25rem', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem' }}>
         <span className="badge" style={{ background: 'rgba(255,255,255,0.2)', color: 'white', marginBottom: '0.4rem' }}>
-          {course.category.replace('_', ' ')}
+          {course.category === 'MAHALLU' ? 'Mahallu Based Study Centre Course' :
+           course.category === 'ONLINE' ? 'Online Course' :
+           course.category === 'OFFLINE_WORKSHOP' ? 'Offline Workshop / Camp' :
+           course.category === 'LANGUAGE_ACADEMY' ? 'CPET Language Academy' :
+           course.category.replace(/_/g, ' ')}
         </span>
         <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0.2rem 0' }}>{course.title}</h2>
         <p style={{ fontSize: '0.85rem', opacity: 0.9, margin: 0 }}>{course.description}</p>
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', fontSize: '0.82rem', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', fontSize: '0.82rem', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '0.5rem', flexWrap: 'wrap' }}>
           {!isMahallu && (
             <span>Fee: <strong>{course.standard_fee > 0 ? `₹${course.standard_fee}` : 'FREE'}</strong></span>
           )}
           <span>Classes: <strong>{course.total_planned_classes} Sessions</strong></span>
-          <span>Mode: <strong>{course.evaluation_type.replace('_', ' ')}</strong></span>
+          <span>Evaluation: <strong>{course.evaluation_type === 'NONE' ? 'No Exam / Open' : course.evaluation_type.replace('_', ' ')}</strong></span>
         </div>
       </div>
 

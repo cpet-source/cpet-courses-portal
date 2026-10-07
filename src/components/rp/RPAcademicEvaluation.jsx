@@ -102,7 +102,7 @@ export const RPAcademicEvaluation = () => {
 
   // Subjects configuration
   const subjects = selectedCourse?.subjects || [];
-  const hasSubjects = subjects.length > 0 && selectedCourse?.evaluation_type !== 'ATTENDANCE_ONLY';
+  const hasSubjects = subjects.length > 0 && selectedCourse?.evaluation_type !== 'ATTENDANCE_ONLY' && selectedCourse?.evaluation_type !== 'NONE';
   const totalClasses = selectedCourse?.total_planned_classes || 12;
   const sessionList = Array.from({ length: totalClasses }, (_, i) => i + 1);
 

@@ -64,7 +64,7 @@ export const CoursesManager = () => {
     setFormData({
       title: course.title || '',
       course_code: course.course_code || '',
-      category: course.category || 'MAHALLU',
+      category: normalizeCategory(course.category),
       description: course.description || '',
       poster_url: course.poster_url || '',
       evaluation_type: course.evaluation_type || 'EXAM_ONLY',
@@ -76,7 +76,7 @@ export const CoursesManager = () => {
       standard_fee: course.standard_fee || 0,
       default_rp_remuneration_per_class: course.default_rp_remuneration_per_class || 0,
       admission_no_pattern: course.admission_no_pattern || 'CPET-{CODE}-26-{SEQ}',
-      subjects: course.subjects || [],
+      subjects: (course.evaluation_type === 'ATTENDANCE_ONLY' || course.evaluation_type === 'NONE') ? [] : (course.subjects || []),
       custom_questions: course.custom_questions || []
     });
     setShowModal(true);
@@ -184,6 +184,34 @@ export const CoursesManager = () => {
     }));
   };
 
+  const normalizeCategory = (cat) => {
+    if (cat === 'GENERAL_ONLINE') return 'ONLINE';
+    if (cat === 'GENERAL_OFFLINE') return 'OFFLINE_WORKSHOP';
+    return cat || 'MAHALLU';
+  };
+
+  const getCategoryLabel = (cat) => {
+    const norm = normalizeCategory(cat);
+    switch (norm) {
+      case 'MAHALLU': return 'Mahallu Based Study Centre Courses';
+      case 'ONLINE': return 'Online Courses';
+      case 'OFFLINE_WORKSHOP': return 'Offline Workshops or Camps';
+      case 'LANGUAGE_ACADEMY': return 'CPET Language Academy';
+      default: return (cat || '').replace(/_/g, ' ');
+    }
+  };
+
+  const getCategoryBadgeClass = (cat) => {
+    const norm = normalizeCategory(cat);
+    switch (norm) {
+      case 'MAHALLU': return 'badge-primary';
+      case 'ONLINE': return 'badge-accent';
+      case 'OFFLINE_WORKSHOP': return 'badge-warning';
+      case 'LANGUAGE_ACADEMY': return 'badge-secondary';
+      default: return 'badge-neutral';
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.title || !formData.course_code) {
@@ -192,27 +220,33 @@ export const CoursesManager = () => {
     }
 
     const slug = formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const isExamBased = formData.evaluation_type === 'EXAM_ONLY' || formData.evaluation_type === 'HYBRID';
+    const finalSubjects = isExamBased ? formData.subjects : [];
+
+    const finalData = {
+      ...formData,
+      subjects: finalSubjects,
+      slug
+    };
 
     if (editingCourseId) {
-      updateCourse(editingCourseId, {
-        ...formData,
-        slug
-      });
+      updateCourse(editingCourseId, finalData);
     } else {
-      addCourse({
-        ...formData,
-        slug
-      });
+      addCourse(finalData);
     }
     setShowModal(false);
   };
 
   const filteredCourses = courses.filter(c => {
     if (filterCategory === 'ALL') return true;
-    if (filterCategory === 'MAHALLU') return c.category === 'MAHALLU';
-    if (filterCategory === 'GENERAL_ONLINE') return c.category === 'GENERAL_ONLINE';
-    if (filterCategory === 'GENERAL_OFFLINE') return c.category === 'GENERAL_OFFLINE';
-    return true;
+    return normalizeCategory(c.category) === filterCategory;
+  });
+
+  // Sort newest courses first (Super Admin Course Builder)
+  const sortedCourses = [...filteredCourses].sort((a, b) => {
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.id ? parseInt(a.id.replace(/\D/g, '') || 0) : 0);
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.id ? parseInt(b.id.replace(/\D/g, '') || 0) : 0);
+    return timeB - timeA;
   });
 
   const handleExportCSV = () => {
@@ -240,14 +274,14 @@ export const CoursesManager = () => {
       'Description'
     ];
 
-    const rows = filteredCourses.map(c => {
+    const rows = sortedCourses.map(c => {
       const enrolledCount = (enrollments || []).filter(e => e.course_id === c.id).length;
       const subjectsList = (c.subjects || []).map(s => `${s.name} (${s.code || ''})`).join('; ');
 
       return [
         `"${c.course_code || ''}"`,
         `"${(c.title || '').replace(/"/g, '""')}"`,
-        `"${c.category || ''}"`,
+        `"${getCategoryLabel(c.category)}"`,
         `"${c.registration_status || 'OPEN'}"`,
         `"${c.registration_deadline || 'No deadline'}"`,
         c.total_planned_classes || 0,
@@ -314,25 +348,31 @@ export const CoursesManager = () => {
           className={`tab-btn ${filterCategory === 'MAHALLU' ? 'active' : ''}`}
           onClick={() => setFilterCategory('MAHALLU')}
         >
-          Mahallu-Based ({courses.filter(c => c.category === 'MAHALLU').length})
+          Mahallu-Based ({courses.filter(c => normalizeCategory(c.category) === 'MAHALLU').length})
         </button>
         <button
-          className={`tab-btn ${filterCategory === 'GENERAL_ONLINE' ? 'active' : ''}`}
-          onClick={() => setFilterCategory('GENERAL_ONLINE')}
+          className={`tab-btn ${filterCategory === 'ONLINE' ? 'active' : ''}`}
+          onClick={() => setFilterCategory('ONLINE')}
         >
-          General Online ({courses.filter(c => c.category === 'GENERAL_ONLINE').length})
+          Online Courses ({courses.filter(c => normalizeCategory(c.category) === 'ONLINE').length})
         </button>
         <button
-          className={`tab-btn ${filterCategory === 'GENERAL_OFFLINE' ? 'active' : ''}`}
-          onClick={() => setFilterCategory('GENERAL_OFFLINE')}
+          className={`tab-btn ${filterCategory === 'OFFLINE_WORKSHOP' ? 'active' : ''}`}
+          onClick={() => setFilterCategory('OFFLINE_WORKSHOP')}
         >
-          General Offline & Camps ({courses.filter(c => c.category === 'GENERAL_OFFLINE').length})
+          Workshops & Camps ({courses.filter(c => normalizeCategory(c.category) === 'OFFLINE_WORKSHOP').length})
+        </button>
+        <button
+          className={`tab-btn ${filterCategory === 'LANGUAGE_ACADEMY' ? 'active' : ''}`}
+          onClick={() => setFilterCategory('LANGUAGE_ACADEMY')}
+        >
+          Language Academy ({courses.filter(c => normalizeCategory(c.category) === 'LANGUAGE_ACADEMY').length})
         </button>
       </div>
 
-      {/* Course List Grid */}
+      {/* Course List Grid (Newest Courses First) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.25rem' }}>
-        {filteredCourses.map(course => (
+        {sortedCourses.map(course => (
           <div key={course.id} className="cpet-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', overflow: 'hidden' }}>
             <div>
               {course.poster_url && (
@@ -353,11 +393,8 @@ export const CoursesManager = () => {
               )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem', gap: '0.5rem' }}>
-                <span className={`badge ${
-                  course.category === 'MAHALLU' ? 'badge-primary' :
-                  course.category === 'GENERAL_ONLINE' ? 'badge-accent' : 'badge-warning'
-                }`}>
-                  {course.category.replace('_', ' ')}
+                <span className={`badge ${getCategoryBadgeClass(course.category)}`}>
+                  {getCategoryLabel(course.category)}
                 </span>
                 <span className="badge badge-neutral" style={{ fontFamily: 'monospace' }}>
                   {course.course_code}
@@ -408,7 +445,7 @@ export const CoursesManager = () => {
                   <span className="badge badge-warning">⏳ Deadline: {course.registration_deadline}</span>
                 )}
 
-                {course.subjects && course.subjects.length > 0 && (
+                {(course.evaluation_type === 'EXAM_ONLY' || course.evaluation_type === 'HYBRID') && course.subjects && course.subjects.length > 0 && (
                   <span className="badge badge-primary">
                     {course.subjects.length} Subjects / Exams
                   </span>
@@ -639,9 +676,10 @@ export const CoursesManager = () => {
                       value={formData.category}
                       onChange={e => setFormData({ ...formData, category: e.target.value })}
                     >
-                      <option value="MAHALLU">Mahallu-Based Study Centre Course</option>
-                      <option value="GENERAL_ONLINE">General Online Diploma / Certificate</option>
-                      <option value="GENERAL_OFFLINE">General Offline Workshop / Camp</option>
+                      <option value="MAHALLU">Mahallu Based Study Centre Courses</option>
+                      <option value="ONLINE">Online Courses</option>
+                      <option value="OFFLINE_WORKSHOP">Offline Workshops or Camps</option>
+                      <option value="LANGUAGE_ACADEMY">CPET Language Academy</option>
                     </select>
                   </div>
                   <div className="form-group">
@@ -649,11 +687,21 @@ export const CoursesManager = () => {
                     <select
                       className="form-select"
                       value={formData.evaluation_type}
-                      onChange={e => setFormData({ ...formData, evaluation_type: e.target.value })}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({
+                          ...prev,
+                          evaluation_type: val,
+                          subjects: (val === 'ATTENDANCE_ONLY' || val === 'NONE')
+                            ? []
+                            : (prev.subjects.length > 0 ? prev.subjects : [{ id: `sub-${Date.now()}`, name: 'Primary Syllabus Subject', code: 'SUB1', max_marks: 100, pass_marks: 40 }])
+                        }));
+                      }}
                     >
                       <option value="EXAM_ONLY">Exam / Marks Only</option>
                       <option value="ATTENDANCE_ONLY">Attendance Only (Workshops/Short Courses)</option>
                       <option value="HYBRID">Hybrid (Both Attendance & Marks)</option>
+                      <option value="NONE">None (No Exam / Attendance Optional)</option>
                     </select>
                   </div>
                 </div>

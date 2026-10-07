@@ -6,6 +6,7 @@ export const RPClassLogger = () => {
   const { currentRp, centres, courses, classLogs, addClassLog, updateClassLog, deleteClassLog, showToast } = useApp();
   const [showLogModal, setShowLogModal] = useState(false);
   const [editingLog, setEditingLog] = useState(null);
+  const [filterMonth, setFilterMonth] = useState('ALL');
 
   const activeCourses = courses.filter(c => c.status !== 'COMPLETED');
   const initialCourseId = activeCourses[0]?.id || courses[0]?.id || '';
@@ -133,6 +134,29 @@ export const RPClassLogger = () => {
     return (b.id || '').localeCompare(a.id || '');
   });
 
+  // Extract distinct YYYY-MM from RP logs
+  const availableMonths = Array.from(new Set(
+    rpLogs
+      .map(l => l.class_date ? l.class_date.slice(0, 7) : null)
+      .filter(Boolean)
+  )).sort().reverse();
+
+  const formatMonthLabel = (ym) => {
+    if (!ym) return ym;
+    const [year, month] = ym.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+    return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  };
+
+  const filteredLogs = sortedLogs.filter(log => {
+    if (filterMonth !== 'ALL' && !log.class_date?.startsWith(filterMonth)) return false;
+    return true;
+  });
+
+  const totalClassesCount = filteredLogs.length;
+  const totalClaimAmount = filteredLogs.reduce((sum, l) => sum + (Number(l.total_claim) || 0), 0);
+  const totalHoursCount = filteredLogs.reduce((sum, l) => sum + (Number(l.hours_spent) || 0), 0);
+
   return (
     <div>
       <div className="cpet-card-header">
@@ -151,14 +175,66 @@ export const RPClassLogger = () => {
         </button>
       </div>
 
-      {/* Recent Logs List (Newest on Top) */}
+      {/* Month-Wise Filter & Claims Summary Bar */}
+      <div className="cpet-card" style={{ marginBottom: '1.25rem', padding: '1rem', background: '#f8fafc', border: '1px solid var(--cpet-border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--cpet-primary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Calendar size={15} /> Filter by Month:
+            </span>
+            <select
+              className="form-select"
+              style={{ width: 'auto', minWidth: '170px', padding: '0.35rem 0.6rem', fontSize: '0.85rem', background: 'white' }}
+              value={filterMonth}
+              onChange={e => setFilterMonth(e.target.value)}
+            >
+              <option value="ALL">All Months ({rpLogs.length} total classes)</option>
+              {availableMonths.map(ym => (
+                <option key={ym} value={ym}>
+                  {formatMonthLabel(ym)} ({rpLogs.filter(l => l.class_date?.startsWith(ym)).length} classes)
+                </option>
+              ))}
+            </select>
+
+            {filterMonth !== 'ALL' && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem' }}
+                onClick={() => setFilterMonth('ALL')}
+              >
+                Clear Filter
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ background: 'white', padding: '0.4rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.82rem' }}>
+              <span style={{ color: '#64748b' }}>Classes: </span>
+              <strong style={{ color: 'var(--cpet-primary)' }}>{totalClassesCount}</strong>
+            </div>
+            <div style={{ background: 'white', padding: '0.4rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.82rem' }}>
+              <span style={{ color: '#64748b' }}>Hours: </span>
+              <strong style={{ color: 'var(--cpet-primary)' }}>{totalHoursCount.toFixed(1)} hrs</strong>
+            </div>
+            <div style={{ background: '#ecfdf5', padding: '0.4rem 0.75rem', borderRadius: '6px', border: '1px solid #a7f3d0', fontSize: '0.82rem' }}>
+              <span style={{ color: '#047857' }}>Claims: </span>
+              <strong style={{ color: '#047857' }}>₹{totalClaimAmount.toLocaleString('en-IN')}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filtered Logs List (Newest on Top) */}
       <div className="mobile-card-list">
-        {sortedLogs.length === 0 ? (
+        {filteredLogs.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '2.5rem', background: 'white', borderRadius: 'var(--radius-lg)', border: '1px solid var(--cpet-border)', color: '#64748b' }}>
-            No class logs recorded yet. Tap "Log Class Taken" after conducting a session.
+            {filterMonth !== 'ALL'
+              ? `No class logs found for ${formatMonthLabel(filterMonth)}. Try selecting another month or tap "Clear Filter".`
+              : 'No class logs recorded yet. Tap "Log Class Taken" after conducting a session.'}
           </div>
         ) : (
-          sortedLogs.map(log => (
+          filteredLogs.map(log => (
             <div key={log.id} className="mobile-data-card">
               <div className="card-top">
                 <div>

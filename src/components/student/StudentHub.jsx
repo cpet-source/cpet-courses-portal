@@ -14,6 +14,7 @@ export const StudentHub = () => {
   // Deep link detection state
   const [registeringCourse, setRegisteringCourse] = useState(null);
   const [deepLinkNotFound, setDeepLinkNotFound] = useState(false);
+  const hasHandledDeepLink = React.useRef(false);
 
   // Default viewMode: If a course query parameter is present, start in 'register', otherwise 'catalog'
   const [viewMode, setViewMode] = useState(() => {
@@ -25,8 +26,11 @@ export const StudentHub = () => {
     }
   });
 
-  // Parse and match course from URL parameters (?course=... or ?slug=... or ?id=...)
+  // Parse and match course from URL parameters (?course=... or ?slug=... or ?id=...) once on initial load
   useEffect(() => {
+    if (hasHandledDeepLink.current) return;
+    if (!courses || courses.length === 0) return;
+
     const params = new URLSearchParams(window.location.search);
     const slugOrId = params.get('course') || params.get('slug') || params.get('id') || params.get('c');
 
@@ -42,11 +46,12 @@ export const StudentHub = () => {
         setRegisteringCourse(matched);
         setViewMode('register');
         setDeepLinkNotFound(false);
-      } else if (courses.length > 0) {
+      } else {
         setDeepLinkNotFound(true);
         setViewMode('catalog');
       }
     }
+    hasHandledDeepLink.current = true;
   }, [courses]);
 
   const handleSelectCourse = (course) => {
@@ -64,9 +69,17 @@ export const StudentHub = () => {
     setRegisteringCourse(null);
     setViewMode('catalog');
     setDeepLinkNotFound(false);
-    if (window.history.pushState) {
-      const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-      window.history.pushState({ path: newUrl }, '', newUrl);
+    if (window.history.replaceState) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  };
+
+  const handleSwitchToLookup = () => {
+    setViewMode('lookup');
+    setRegisteringCourse(null);
+    setDeepLinkNotFound(false);
+    if (window.history.replaceState) {
+      window.history.replaceState({}, '', window.location.pathname);
     }
   };
 
@@ -100,10 +113,10 @@ export const StudentHub = () => {
         </button>
         <button
           className={`tab-btn ${viewMode === 'lookup' ? 'active' : ''}`}
-          onClick={() => { setViewMode('lookup'); setRegisteringCourse(null); }}
+          onClick={handleSwitchToLookup}
         >
           <Search size={16} />
-          <span>Student Results & Attendance</span>
+          <span>Track Progress</span>
         </button>
       </div>
 
@@ -176,37 +189,6 @@ export const StudentHub = () => {
                 Lookup
               </button>
             </form>
-
-            {/* Quick Demo Chips */}
-            <div style={{ marginTop: '1rem', fontSize: '0.78rem', color: '#64748b' }}>
-              <span>Try test numbers: </span>
-              <button
-                className="btn btn-secondary btn-sm"
-                style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', margin: '0 4px' }}
-                onClick={() => {
-                  setPhoneSearch('9895112233');
-                  const found = lookupStudentByPhone('9895112233');
-                  setAccountData(found);
-                  setHasSearched(true);
-                  if (found) setSelectedMember(found.members[0]);
-                }}
-              >
-                9895112233 (Ameen & Khadija)
-              </button>
-              <button
-                className="btn btn-secondary btn-sm"
-                style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
-                onClick={() => {
-                  setPhoneSearch('9744556677');
-                  const found = lookupStudentByPhone('9744556677');
-                  setAccountData(found);
-                  setHasSearched(true);
-                  if (found) setSelectedMember(found.members[0]);
-                }}
-              >
-                9744556677 (Aysha)
-              </button>
-            </div>
           </div>
 
           {/* Lookup Results */}
@@ -317,6 +299,7 @@ export const StudentHub = () => {
                                       {targetCourse?.evaluation_type === 'EXAM_ONLY' && (hasMarks ? 'Graded' : 'Exam Awaited')}
                                       {targetCourse?.evaluation_type === 'ATTENDANCE_ONLY' && (enr.completion_status === 'COMPLETED' ? 'Attendance Fulfilled' : 'In Progress')}
                                       {targetCourse?.evaluation_type === 'HYBRID' && 'Continuous Evaluation'}
+                                      {targetCourse?.evaluation_type === 'NONE' && (enr.completion_status === 'COMPLETED' ? 'Course Completed' : 'Participating')}
                                     </strong>
                                   </div>
                                 </div>

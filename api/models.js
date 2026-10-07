@@ -5,7 +5,7 @@ const CourseSchema = new mongoose.Schema({
   slug: String,
   title: { type: String, required: true },
   course_code: { type: String, required: true },
-  category: { type: String, enum: ['MAHALLU', 'GENERAL_ONLINE', 'GENERAL_OFFLINE'], default: 'MAHALLU' },
+  category: { type: String, enum: ['MAHALLU', 'ONLINE', 'OFFLINE_WORKSHOP', 'LANGUAGE_ACADEMY', 'GENERAL_ONLINE', 'GENERAL_OFFLINE'], default: 'MAHALLU' },
   description: String,
   evaluation_type: { type: String, default: 'EXAM_ONLY' },
   payment_policy: { type: String, default: 'PAY_AT_REGISTRATION' },
