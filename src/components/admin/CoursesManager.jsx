@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download, Building, Upload, Image as ImageIcon, Users, Layers, Search, Filter, X } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download, Building, Upload, Image as ImageIcon, Users, Layers, Search, Filter, X, AlertCircle } from 'lucide-react';
 
 export const CoursesManager = () => {
   const {
@@ -10,6 +10,7 @@ export const CoursesManager = () => {
     resourcePersons,
     addCourse,
     updateCourse,
+    deleteCourse,
     toggleCourseStatus,
     toggleCentreCourseCompletion,
     addCourseBatch,
@@ -21,6 +22,7 @@ export const CoursesManager = () => {
   const [filterCategory, setFilterCategory] = useState('ALL');
   const [showModal, setShowModal] = useState(false);
   const [editingCourseId, setEditingCourseId] = useState(null);
+  const [courseToDelete, setCourseToDelete] = useState(null);
 
   // Enrolled Students Modal State
   const [selectedCourseForStudentsModal, setSelectedCourseForStudentsModal] = useState(null);
@@ -898,6 +900,17 @@ export const CoursesManager = () => {
                   <Edit2 size={14} />
                   <span>Edit</span>
                 </button>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setCourseToDelete(course)}
+                  title="Permanently Delete Course"
+                  style={{ color: '#dc2626', borderColor: '#fecaca', background: '#fef2f2' }}
+                >
+                  <Trash2 size={14} />
+                  <span className="hide-on-mobile">Delete</span>
+                </button>
               </div>
             </div>
           </div>
@@ -1521,15 +1534,125 @@ export const CoursesManager = () => {
                 ))}
               </div>
 
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingCourseId ? 'Save Changes' : 'Create Course'}
-                </button>
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: editingCourseId ? 'space-between' : 'flex-end', alignItems: 'center' }}>
+                {editingCourseId && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    style={{ color: '#dc2626', borderColor: '#fca5a5', background: '#fff5f5', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    onClick={() => {
+                      const target = courses.find(c => c.id === editingCourseId);
+                      if (target) setCourseToDelete(target);
+                    }}
+                  >
+                    <Trash2 size={14} /> Delete Course
+                  </button>
+                )}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    {editingCourseId ? 'Save Changes' : 'Create Course'}
+                  </button>
+                </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Course Confirmation Modal */}
+      {courseToDelete && (
+        <div className="modal-overlay" onClick={() => setCourseToDelete(null)}>
+          <div
+            className="modal-content"
+            style={{ maxWidth: '490px', width: '92%' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="modal-header" style={{ borderBottom: '1px solid #fee2e2' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Trash2 size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, color: '#dc2626', fontSize: '1.15rem' }}>Delete Course</h3>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Permanent Administrative Action</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setCourseToDelete(null)}
+                style={{ padding: '0.25rem 0.5rem' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.25rem 0' }}>
+              <p style={{ margin: '0 0 0.75rem', color: '#1e293b', fontSize: '0.92rem' }}>
+                Are you sure you want to permanently delete:
+              </p>
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '1rem' }}>
+                <strong style={{ color: 'var(--cpet-primary)', fontSize: '1rem', display: 'block', marginBottom: '4px' }}>
+                  {courseToDelete.title}
+                </strong>
+                <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.75rem' }}>
+                  <span className="badge badge-neutral">{courseToDelete.course_code}</span>
+                  <span className="badge badge-primary">{getCategoryLabel(courseToDelete.category)}</span>
+                </div>
+              </div>
+
+              {(() => {
+                const enrolledCount = enrollments.filter(e => e.course_id === courseToDelete.id).length;
+                if (enrolledCount > 0) {
+                  return (
+                    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.75rem', color: '#991b1b', fontSize: '0.82rem', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <div>
+                        <strong>Warning: {enrolledCount} enrolled student(s) found!</strong>
+                        <p style={{ margin: '3px 0 0', lineHeight: 1.35 }}>
+                          Deleting this course will permanently remove it from the catalog, portals, and unbind attached study centres.
+                        </p>
+                      </div>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '0.75rem', color: '#166534', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <CheckCircle size={18} style={{ flexShrink: 0 }} />
+                      <span>No students are enrolled in this course. It is completely safe to remove.</span>
+                    </div>
+                  );
+                }
+              })()}
+            </div>
+
+            <div className="modal-footer" style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setCourseToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                style={{ background: '#dc2626', color: 'white', display: 'flex', alignItems: 'center', gap: '6px' }}
+                onClick={() => {
+                  deleteCourse(courseToDelete.id);
+                  if (editingCourseId === courseToDelete.id) {
+                    setShowModal(false);
+                  }
+                  setCourseToDelete(null);
+                }}
+              >
+                <Trash2 size={15} />
+                <span>Permanently Delete</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

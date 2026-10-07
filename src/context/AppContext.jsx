@@ -395,6 +395,37 @@ export const AppProvider = ({ children }) => {
     showToast('Course updated successfully!');
   };
 
+  const deleteCourse = (courseId) => {
+    const targetCourse = courses.find(c => c.id === courseId);
+    setCourses(prev => prev.filter(c => c.id !== courseId));
+    deleteFromCloud('Course', courseId);
+
+    // Cleanly unlink deleted course from any study centres
+    setCentres(prev => prev.map(c => {
+      let changed = false;
+      let updated = { ...c };
+      if (c.active_course_id === courseId) {
+        updated.active_course_id = null;
+        changed = true;
+      }
+      if (Array.isArray(c.course_ids) && c.course_ids.includes(courseId)) {
+        updated.course_ids = c.course_ids.filter(id => id !== courseId);
+        changed = true;
+      }
+      if (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(courseId)) {
+        updated.completed_course_ids = c.completed_course_ids.filter(id => id !== courseId);
+        changed = true;
+      }
+      if (changed) {
+        syncToCloud('Centre', updated);
+        return updated;
+      }
+      return c;
+    }));
+
+    showToast(`Course "${targetCourse?.title || 'Course'}" deleted successfully.`);
+  };
+
   const toggleCourseStatus = (courseId) => {
     let nextStatus = 'COMPLETED';
     setCourses(prev => prev.map(c => {
@@ -1108,6 +1139,7 @@ export const AppProvider = ({ children }) => {
         // Methods
         addCourse,
         updateCourse,
+        deleteCourse,
         toggleCourseStatus,
         toggleCentreCourseCompletion,
         addCourseBatch,
