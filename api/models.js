@@ -18,6 +18,7 @@ const CourseSchema = new mongoose.Schema({
   registration_status: { type: String, default: 'OPEN' }, // 'OPEN' | 'CLOSED' | 'UPCOMING'
   registration_deadline: String, // 'YYYY-MM-DD'
   poster_url: String, // Base64 data URL or external image URL
+  batches: [mongoose.Schema.Types.Mixed], // Array of { id, batch_number, batch_name, status, assigned_rp_id, assigned_rp_name, start_date }
   subjects: [mongoose.Schema.Types.Mixed],
   custom_questions: [mongoose.Schema.Types.Mixed]
 }, { timestamps: true });
@@ -72,6 +73,8 @@ const EnrollmentSchema = new mongoose.Schema({
   course_title: String,
   centre_id: String,
   centre_name: String,
+  batch_id: String,
+  batch_name: String,
   admission_number: { type: String, required: true },
   enrollment_date: String,
   fee_status: { type: String, default: 'PENDING' },
@@ -87,8 +90,10 @@ const ClassLogSchema = new mongoose.Schema({
   id: { type: String, unique: true, required: true },
   rp_id: { type: String, required: true },
   rp_name: String,
-  centre_id: { type: String, required: true },
+  centre_id: String,
   centre_name: String,
+  batch_id: String,
+  batch_name: String,
   course_id: { type: String, required: true },
   course_title: String,
   class_date: { type: String, required: true },

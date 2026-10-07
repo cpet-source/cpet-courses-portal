@@ -20,6 +20,7 @@ export const RPClassLogger = () => {
   const [formData, setFormData] = useState({
     course_id: initialCourseId,
     centre_id: initialCentresForCourse[0]?.id || '',
+    batch_id: '',
     class_date: new Date().toISOString().split('T')[0],
     session_type: 'REGULAR_CLASS',
     hours_spent: 2.0,
@@ -30,6 +31,7 @@ export const RPClassLogger = () => {
   const [editFormData, setEditFormData] = useState({
     course_id: '',
     centre_id: '',
+    batch_id: '',
     class_date: '',
     session_type: 'REGULAR_CLASS',
     hours_spent: 2.0,
@@ -50,34 +52,47 @@ export const RPClassLogger = () => {
     : [];
 
   const handleCourseChange = (newCourseId) => {
+    const targetCourse = courses.find(c => c.id === newCourseId);
+    const isMahallu = targetCourse?.category === 'MAHALLU';
     const matchingCentres = centres.filter(c => {
       if (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(newCourseId)) return false;
       return c.active_course_id === newCourseId || (Array.isArray(c.course_ids) && c.course_ids.includes(newCourseId));
     });
 
+    const activeBatch = targetCourse?.batches?.find(b => b.status === 'ADMISSIONS_OPEN' || b.status === 'ONGOING') || targetCourse?.batches?.[0];
+
     setFormData(prev => ({
       ...prev,
       course_id: newCourseId,
-      centre_id: matchingCentres[0]?.id || ''
+      centre_id: isMahallu ? (matchingCentres[0]?.id || '') : '',
+      batch_id: !isMahallu ? (activeBatch?.id || 'batch-1') : ''
     }));
   };
 
   const handleEditCourseChange = (newCourseId) => {
+    const targetCourse = courses.find(c => c.id === newCourseId);
+    const isMahallu = targetCourse?.category === 'MAHALLU';
     const matchingCentres = centres.filter(c => {
       return c.active_course_id === newCourseId || (Array.isArray(c.course_ids) && c.course_ids.includes(newCourseId));
     });
 
+    const activeBatch = targetCourse?.batches?.find(b => b.status === 'ADMISSIONS_OPEN' || b.status === 'ONGOING') || targetCourse?.batches?.[0];
+
     setEditFormData(prev => ({
       ...prev,
       course_id: newCourseId,
-      centre_id: matchingCentres[0]?.id || ''
+      centre_id: isMahallu ? (matchingCentres[0]?.id || '') : '',
+      batch_id: !isMahallu ? (activeBatch?.id || 'batch-1') : ''
     }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.course_id || !formData.centre_id || !formData.syllabus_covered) {
-      showToast('Please select course, study centre, and syllabus covered', 'danger');
+    const targetCourse = courses.find(c => c.id === formData.course_id);
+    const isMahallu = targetCourse?.category === 'MAHALLU';
+
+    if (!formData.course_id || (isMahallu && !formData.centre_id) || !formData.syllabus_covered) {
+      showToast(isMahallu ? 'Please select course, study centre, and syllabus covered' : 'Please select course and enter syllabus covered', 'danger');
       return;
     }
 
@@ -92,6 +107,7 @@ export const RPClassLogger = () => {
     setFormData({
       course_id: defaultCrsId,
       centre_id: defCentres[0]?.id || '',
+      batch_id: '',
       class_date: new Date().toISOString().split('T')[0],
       session_type: 'REGULAR_CLASS',
       hours_spent: 2.0,
@@ -104,6 +120,7 @@ export const RPClassLogger = () => {
     setEditFormData({
       course_id: log.course_id || '',
       centre_id: log.centre_id || '',
+      batch_id: log.batch_id || '',
       class_date: log.class_date || new Date().toISOString().split('T')[0],
       session_type: log.session_type || 'REGULAR_CLASS',
       hours_spent: log.hours_spent || 2.0,
@@ -113,8 +130,11 @@ export const RPClassLogger = () => {
 
   const handleEditSubmit = (e) => {
     e.preventDefault();
-    if (!editFormData.course_id || !editFormData.centre_id || !editFormData.syllabus_covered) {
-      showToast('Please select course, study centre, and syllabus covered', 'danger');
+    const targetCourse = courses.find(c => c.id === editFormData.course_id);
+    const isMahallu = targetCourse?.category === 'MAHALLU';
+
+    if (!editFormData.course_id || (isMahallu && !editFormData.centre_id) || !editFormData.syllabus_covered) {
+      showToast(isMahallu ? 'Please select course, study centre, and syllabus covered' : 'Please select course and enter syllabus covered', 'danger');
       return;
     }
 
@@ -328,35 +348,70 @@ export const RPClassLogger = () => {
                   </select>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
-                    2. Study Centre <span className="required">*</span>
-                  </label>
-                  <select
-                    className="form-select"
-                    required
-                    disabled={!formData.course_id}
-                    value={formData.centre_id}
-                    onChange={e => setFormData({ ...formData, centre_id: e.target.value })}
-                    style={{ fontWeight: 600 }}
-                  >
-                    <option value="">
-                      {!formData.course_id
-                        ? '-- Please Select Course First --'
-                        : availableCentresForAdd.length === 0
-                        ? '-- No Centres Registered for this Course --'
-                        : '-- Select Study Centre --'}
-                    </option>
-                    {availableCentresForAdd.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.centre_name} ({c.place}, {c.district})
-                      </option>
-                    ))}
-                  </select>
-                  <span className="form-helper">
-                    Only centres registered for the selected course are displayed.
-                  </span>
-                </div>
+                {(() => {
+                  const targetCrs = courses.find(c => c.id === formData.course_id);
+                  const isMahallu = targetCrs?.category === 'MAHALLU';
+
+                  if (isMahallu) {
+                    return (
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                          2. Study Centre <span className="required">*</span>
+                        </label>
+                        <select
+                          className="form-select"
+                          required
+                          disabled={!formData.course_id}
+                          value={formData.centre_id}
+                          onChange={e => setFormData({ ...formData, centre_id: e.target.value })}
+                          style={{ fontWeight: 600 }}
+                        >
+                          <option value="">
+                            {!formData.course_id
+                              ? '-- Please Select Course First --'
+                              : availableCentresForAdd.length === 0
+                              ? '-- No Centres Registered for this Course --'
+                              : '-- Select Study Centre --'}
+                          </option>
+                          {availableCentresForAdd.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.centre_name} ({c.place}, {c.district})
+                            </option>
+                          ))}
+                        </select>
+                        <span className="form-helper">
+                          Only centres registered for the selected course are displayed.
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                        2. Batch / Intake Cohort <span className="required">*</span>
+                      </label>
+                      <select
+                        className="form-select"
+                        required
+                        disabled={!formData.course_id}
+                        value={formData.batch_id}
+                        onChange={e => setFormData({ ...formData, batch_id: e.target.value })}
+                        style={{ fontWeight: 600 }}
+                      >
+                        {(!targetCrs?.batches || targetCrs.batches.length === 0) ? (
+                          <option value="batch-1">Batch 1 (Main Cohort)</option>
+                        ) : (
+                          targetCrs.batches.map(b => (
+                            <option key={b.id} value={b.id}>
+                              {b.batch_name} [{b.status.replace(/_/g, ' ')}]
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                  );
+                })()}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group">
@@ -452,32 +507,67 @@ export const RPClassLogger = () => {
                   </select>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
-                    2. Study Centre <span className="required">*</span>
-                  </label>
-                  <select
-                    className="form-select"
-                    required
-                    disabled={!editFormData.course_id}
-                    value={editFormData.centre_id}
-                    onChange={e => setEditFormData({ ...editFormData, centre_id: e.target.value })}
-                    style={{ fontWeight: 600 }}
-                  >
-                    <option value="">
-                      {!editFormData.course_id
-                        ? '-- Please Select Course First --'
-                        : availableCentresForEdit.length === 0
-                        ? '-- No Centres Registered for this Course --'
-                        : '-- Select Study Centre --'}
-                    </option>
-                    {availableCentresForEdit.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.centre_name} ({c.place}, {c.district})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {(() => {
+                  const targetCrs = courses.find(c => c.id === editFormData.course_id);
+                  const isMahallu = targetCrs?.category === 'MAHALLU';
+
+                  if (isMahallu) {
+                    return (
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                          2. Study Centre <span className="required">*</span>
+                        </label>
+                        <select
+                          className="form-select"
+                          required
+                          disabled={!editFormData.course_id}
+                          value={editFormData.centre_id}
+                          onChange={e => setEditFormData({ ...editFormData, centre_id: e.target.value })}
+                          style={{ fontWeight: 600 }}
+                        >
+                          <option value="">
+                            {!editFormData.course_id
+                              ? '-- Please Select Course First --'
+                              : availableCentresForEdit.length === 0
+                              ? '-- No Centres Registered for this Course --'
+                              : '-- Select Study Centre --'}
+                          </option>
+                          {availableCentresForEdit.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.centre_name} ({c.place}, {c.district})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                        2. Batch / Intake Cohort <span className="required">*</span>
+                      </label>
+                      <select
+                        className="form-select"
+                        required
+                        disabled={!editFormData.course_id}
+                        value={editFormData.batch_id}
+                        onChange={e => setEditFormData({ ...editFormData, batch_id: e.target.value })}
+                        style={{ fontWeight: 600 }}
+                      >
+                        {(!targetCrs?.batches || targetCrs.batches.length === 0) ? (
+                          <option value="batch-1">Batch 1 (Main Cohort)</option>
+                        ) : (
+                          targetCrs.batches.map(b => (
+                            <option key={b.id} value={b.id}>
+                              {b.batch_name} [{b.status.replace(/_/g, ' ')}]
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                  );
+                })()}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group">

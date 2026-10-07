@@ -39,9 +39,9 @@ export const RPAcademicEvaluation = () => {
     }
   });
 
-  const mahalluCourses = baseCourses.filter(c => c.category === 'MAHALLU');
-  const availableCourses = mahalluCourses.length > 0 ? mahalluCourses : baseCourses;
+  const availableCourses = baseCourses;
   const [selectedCourseId, setSelectedCourseId] = useState(availableCourses[0]?.id || '');
+  const [selectedBatchId, setSelectedBatchId] = useState('ALL');
 
   useEffect(() => {
     if (!availableCourses.some(c => c.id === selectedCourseId)) {
@@ -85,9 +85,15 @@ export const RPAcademicEvaluation = () => {
   // Bulk session attendance state
   const [bulkSessionNumber, setBulkSessionNumber] = useState(1);
 
-  // Filter students in current (Course, Centre)
+  // Filter students in current (Course, Centre or Batch)
   const batchStudents = enrollments.filter(e => {
-    return e.course_id === selectedCourseId && e.centre_id === selectedCentreId;
+    if (e.course_id !== selectedCourseId) return false;
+    if (selectedCourse?.category === 'MAHALLU') {
+      return e.centre_id === selectedCentreId;
+    } else {
+      if (!selectedBatchId || selectedBatchId === 'ALL') return true;
+      return e.batch_id === selectedBatchId || e.batch_name === selectedBatchId;
+    }
   });
 
   const filteredStudents = batchStudents.filter(e => {
@@ -196,37 +202,58 @@ export const RPAcademicEvaluation = () => {
             </select>
           </div>
 
-          {/* 2. Select Centre */}
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
-              2. Select Study Centre:
-            </label>
-            <select
-              className="form-select"
-              value={selectedCentreId}
-              onChange={e => setSelectedCentreId(e.target.value)}
-              style={{ fontWeight: 700 }}
-            >
-              {courseCentres.length > 0 && (
-                <optgroup label="Centres offering this course">
-                  {courseCentres.map(c => (
-                    <option key={c.id} value={c.id}>
-                      ★ {c.centre_name} ({c.place})
-                    </option>
-                  ))}
+          {/* 2. Select Centre (Mahallu) OR Batch (Online / Language / Workshops) */}
+          {selectedCourse?.category === 'MAHALLU' ? (
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                2. Select Study Centre:
+              </label>
+              <select
+                className="form-select"
+                value={selectedCentreId}
+                onChange={e => setSelectedCentreId(e.target.value)}
+                style={{ fontWeight: 700 }}
+              >
+                {courseCentres.length > 0 && (
+                  <optgroup label="Centres offering this course">
+                    {courseCentres.map(c => (
+                      <option key={c.id} value={c.id}>
+                        ★ {c.centre_name} ({c.place})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label={courseCentres.length > 0 ? "Other Study Centres" : "All Study Centres"}>
+                  {centres
+                    .filter(c => !courseCentres.some(m => m.id === c.id))
+                    .map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.centre_name} ({c.place})
+                      </option>
+                    ))}
                 </optgroup>
-              )}
-              <optgroup label={courseCentres.length > 0 ? "Other Study Centres" : "All Study Centres"}>
-                {centres
-                  .filter(c => !courseCentres.some(m => m.id === c.id))
-                  .map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.centre_name} ({c.place})
-                    </option>
-                  ))}
-              </optgroup>
-            </select>
-          </div>
+              </select>
+            </div>
+          ) : (
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                2. Select Intake Batch:
+              </label>
+              <select
+                className="form-select"
+                value={selectedBatchId}
+                onChange={e => setSelectedBatchId(e.target.value)}
+                style={{ fontWeight: 700 }}
+              >
+                <option value="ALL">All Batches</option>
+                {(selectedCourse?.batches || []).map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.batch_name} [{b.status.replace(/_/g, ' ')}]
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Search Field */}
           <div className="form-group" style={{ margin: 0 }}>

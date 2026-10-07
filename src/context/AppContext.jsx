@@ -366,7 +366,9 @@ export const AppProvider = ({ children }) => {
       ...courseData,
       slug,
       id: courseData.id || `crs-${Date.now()}`,
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      createdAt: courseData.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
     setCourses(prev => [newCourse, ...prev]);
     syncToCloud('Course', newCourse).then(synced => {
@@ -442,6 +444,85 @@ export const AppProvider = ({ children }) => {
         : `Batch for "${targetCourse?.title || 'Course'}" at "${targetCentre?.centre_name || 'Centre'}" re-activated!`,
       isNowCompleted ? 'success' : 'info'
     );
+  };
+
+  // Batch Lifecycle for Online, Language Academy, and Workshop courses
+  const addCourseBatch = (courseId, customBatchName = '') => {
+    let createdBatch = null;
+    setCourses(prev => prev.map(c => {
+      if (c.id === courseId) {
+        const existingBatches = Array.isArray(c.batches) ? [...c.batches] : [];
+        const nextNum = existingBatches.length > 0
+          ? Math.max(...existingBatches.map(b => Number(b.batch_number) || 0)) + 1
+          : 1;
+
+        createdBatch = {
+          id: `batch-${Date.now()}`,
+          batch_number: nextNum,
+          batch_name: customBatchName || `Batch ${nextNum}`,
+          status: 'ADMISSIONS_OPEN',
+          assigned_rp_id: '',
+          assigned_rp_name: '',
+          start_date: new Date().toISOString().split('T')[0],
+          created_at: new Date().toISOString()
+        };
+
+        const updated = {
+          ...c,
+          registration_status: 'OPEN',
+          batches: [...existingBatches, createdBatch]
+        };
+        syncToCloud('Course', updated);
+        return updated;
+      }
+      return c;
+    }));
+    showToast(`New intake "${createdBatch?.batch_name || 'Batch'}" created & opened for admissions!`);
+    return createdBatch;
+  };
+
+  const updateBatchStatus = (courseId, batchId, nextStatus) => {
+    setCourses(prev => prev.map(c => {
+      if (c.id === courseId) {
+        const existingBatches = Array.isArray(c.batches) ? c.batches : [];
+        const updatedBatches = existingBatches.map(b => {
+          if (b.id === batchId) {
+            return { ...b, status: nextStatus };
+          }
+          return b;
+        });
+
+        const hasOpenBatch = updatedBatches.some(b => b.status === 'ADMISSIONS_OPEN');
+        const updated = {
+          ...c,
+          registration_status: hasOpenBatch ? 'OPEN' : 'CLOSED',
+          batches: updatedBatches
+        };
+        syncToCloud('Course', updated);
+        return updated;
+      }
+      return c;
+    }));
+    showToast(`Batch status updated to ${nextStatus.replace(/_/g, ' ')}!`);
+  };
+
+  const assignRpToBatch = (courseId, batchId, rpId, rpName) => {
+    setCourses(prev => prev.map(c => {
+      if (c.id === courseId) {
+        const existingBatches = Array.isArray(c.batches) ? c.batches : [];
+        const updatedBatches = existingBatches.map(b => {
+          if (b.id === batchId) {
+            return { ...b, assigned_rp_id: rpId, assigned_rp_name: rpName };
+          }
+          return b;
+        });
+        const updated = { ...c, batches: updatedBatches };
+        syncToCloud('Course', updated);
+        return updated;
+      }
+      return c;
+    }));
+    showToast('Teacher assigned to batch successfully!');
   };
 
   // 2. Study Centre Management
@@ -549,7 +630,48 @@ export const AppProvider = ({ children }) => {
   // 4. Student Account & Enrollment Engine (Universal Phone)
   const lookupStudentByPhone = (rawPhone) => {
     const cleanPhone = (rawPhone || '').trim().replace(/\D/g, '').slice(-10);
-    return students.find(s => s.account_phone === cleanPhone);
+    if (!cleanPhone || cleanPhone.length < 10) return null;
+
+    // Check registered accounts first (with normalized digit matching)
+    const found = students.find(s => {
+      const p1 = (s.account_phone || '').trim().replace(/\D/g, '').slice(-10);
+      const p2 = (s.whatsapp_number || '').trim().replace(/\D/g, '').slice(-10);
+      return p1 === cleanPhone || p2 === cleanPhone;
+    });
+    if (found) return found;
+
+    // Fallback: Check if any enrollments exist with this phone and synthesize account object
+    const matchingEnrollments = enrollments.filter(e => {
+      const p1 = (e.account_phone || '').trim().replace(/\D/g, '').slice(-10);
+      const p2 = (e.phone || '').trim().replace(/\D/g, '').slice(-10);
+      return p1 === cleanPhone || p2 === cleanPhone;
+    });
+
+    if (matchingEnrollments.length > 0) {
+      const memberMap = new Map();
+      matchingEnrollments.forEach((e, idx) => {
+        const key = e.student_profile_id || e.student_name || `member-${idx}`;
+        if (!memberMap.has(key)) {
+          memberMap.set(key, {
+            id: e.student_profile_id || `prof-${idx}`,
+            full_name: e.student_name || 'Student',
+            gender: e.gender || 'MALE',
+            date_of_birth: e.date_of_birth || '',
+            relationship: memberMap.size === 0 ? 'Self' : 'Family Member',
+            place: e.centre_name || '',
+            district: ''
+          });
+        }
+      });
+
+      return {
+        account_phone: cleanPhone,
+        whatsapp_number: matchingEnrollments[0].whatsapp_number || cleanPhone,
+        members: Array.from(memberMap.values())
+      };
+    }
+
+    return null;
   };
 
   const registerOrEnrollStudent = ({
@@ -559,6 +681,7 @@ export const AppProvider = ({ children }) => {
     newMemberData,
     courseId,
     centreId,
+    batchId,
     customResponses = {},
     feeStatus = 'PENDING',
     amountPaid = 0
@@ -630,6 +753,28 @@ export const AppProvider = ({ children }) => {
       .replace('{CODE}', targetCourse?.course_code || 'GEN')
       .replace('{SEQ}', seq);
 
+    // Determine batch for non-Mahallu courses
+    let assignedBatchId = null;
+    let assignedBatchName = null;
+
+    if (targetCourse?.category !== 'MAHALLU') {
+      const courseBatches = Array.isArray(targetCourse?.batches) ? targetCourse.batches : [];
+      if (batchId) {
+        const found = courseBatches.find(b => b.id === batchId || b.batch_name === batchId);
+        assignedBatchId = found ? found.id : batchId;
+        assignedBatchName = found ? found.batch_name : (typeof batchId === 'string' ? batchId : 'Batch 1');
+      } else {
+        const openBatch = courseBatches.find(b => b.status === 'ADMISSIONS_OPEN') || courseBatches[courseBatches.length - 1];
+        if (openBatch) {
+          assignedBatchId = openBatch.id;
+          assignedBatchName = openBatch.batch_name;
+        } else {
+          assignedBatchId = 'batch-1';
+          assignedBatchName = 'Batch 1';
+        }
+      }
+    }
+
     const newEnrollment = {
       id: `enr-${Date.now()}`,
       account_phone: cleanPhone,
@@ -638,7 +783,9 @@ export const AppProvider = ({ children }) => {
       course_id: courseId,
       course_title: targetCourse?.title || 'Course',
       centre_id: centreId || null,
-      centre_name: targetCentre ? targetCentre.centre_name : (targetCourse?.category === 'GENERAL_ONLINE' ? 'Online Session' : 'CPET Main Campus'),
+      centre_name: targetCentre ? targetCentre.centre_name : (targetCourse?.category === 'ONLINE' ? 'Online Session' : 'CPET Main Campus'),
+      batch_id: assignedBatchId,
+      batch_name: assignedBatchName,
       admission_number: admissionNumber,
       enrollment_date: new Date().toISOString().split('T')[0],
       fee_status: feeStatus,
@@ -664,7 +811,14 @@ export const AppProvider = ({ children }) => {
   // 5. Class Log Engine (RP & Remuneration)
   const addClassLog = (logData) => {
     const targetCourse = courses.find(c => c.id === logData.course_id);
+    const isMahallu = targetCourse?.category === 'MAHALLU';
     const targetCentre = centres.find(c => c.id === logData.centre_id);
+    let batchName = logData.batch_name;
+    if (!isMahallu && !batchName && logData.batch_id) {
+      const b = targetCourse?.batches?.find(item => item.id === logData.batch_id);
+      batchName = b ? b.batch_name : 'Batch 1';
+    }
+
     const standardRate = logData.standard_rate || targetCourse?.default_rp_remuneration_per_class || 800;
     const travelAllowance = Number(logData.travel_allowance || 0);
 
@@ -672,8 +826,10 @@ export const AppProvider = ({ children }) => {
       id: `log-${Date.now()}`,
       rp_id: currentRp.id,
       rp_name: currentRp.full_name,
-      centre_id: logData.centre_id,
-      centre_name: targetCentre ? targetCentre.centre_name : 'Centre',
+      centre_id: isMahallu ? (logData.centre_id || null) : null,
+      centre_name: isMahallu ? (targetCentre ? targetCentre.centre_name : 'Centre') : (batchName || 'Online / Workshop Session'),
+      batch_id: !isMahallu ? (logData.batch_id || null) : null,
+      batch_name: !isMahallu ? (batchName || 'Batch 1') : null,
       course_id: logData.course_id,
       course_title: targetCourse ? targetCourse.title : 'Course',
       class_date: logData.class_date,
@@ -697,14 +853,26 @@ export const AppProvider = ({ children }) => {
     setClassLogs(prev => prev.map(log => {
       if (log.id === logId) {
         const targetCourse = courses.find(c => c.id === (updatedFields.course_id || log.course_id));
+        const isMahallu = targetCourse?.category === 'MAHALLU';
         const targetCentre = centres.find(c => c.id === (updatedFields.centre_id || log.centre_id));
+
+        let batchName = updatedFields.batch_name || log.batch_name;
+        const batchId = updatedFields.batch_id !== undefined ? updatedFields.batch_id : log.batch_id;
+        if (!isMahallu && !batchName && batchId) {
+          const b = targetCourse?.batches?.find(item => item.id === batchId);
+          batchName = b ? b.batch_name : 'Batch 1';
+        }
+
         const standardRate = updatedFields.standard_rate || log.standard_rate || targetCourse?.default_rp_remuneration_per_class || 800;
         const travelAllowance = Number(updatedFields.travel_allowance !== undefined ? updatedFields.travel_allowance : (log.travel_allowance || 0));
 
         const updated = {
           ...log,
           ...updatedFields,
-          centre_name: targetCentre ? targetCentre.centre_name : log.centre_name,
+          centre_id: isMahallu ? (updatedFields.centre_id || log.centre_id || null) : null,
+          centre_name: isMahallu ? (targetCentre ? targetCentre.centre_name : log.centre_name) : (batchName || 'Online / Workshop Session'),
+          batch_id: !isMahallu ? batchId : null,
+          batch_name: !isMahallu ? batchName : null,
           course_title: targetCourse ? targetCourse.title : log.course_title,
           standard_rate: standardRate,
           travel_allowance: travelAllowance,
@@ -942,6 +1110,9 @@ export const AppProvider = ({ children }) => {
         updateCourse,
         toggleCourseStatus,
         toggleCentreCourseCompletion,
+        addCourseBatch,
+        updateBatchStatus,
+        assignRpToBatch,
         addCentre,
         updateCentre,
         deleteCentre,

@@ -39,6 +39,10 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
     }
   }, [course, availableCentres, selectedCentreId, isMahallu]);
 
+  const activeBatch = !isMahallu && Array.isArray(course?.batches)
+    ? (course.batches.find(b => b.status === 'ADMISSIONS_OPEN') || course.batches[course.batches.length - 1])
+    : null;
+
   // Dynamic Custom Intake Responses
   const [customAnswers, setCustomAnswers] = useState({});
 
@@ -144,6 +148,7 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
       newMemberData,
       courseId: course.id,
       centreId: course.category === 'MAHALLU' ? selectedCentreId : null,
+      batchId: !isMahallu && activeBatch ? activeBatch.id : null,
       customResponses: {
         ...customAnswers,
         ...(paymentUtr ? { 'Payment UTR / Ref': paymentUtr } : {})
@@ -196,6 +201,9 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
         <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', fontSize: '0.82rem', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '0.5rem', flexWrap: 'wrap' }}>
           {!isMahallu && (
             <span>Fee: <strong>{course.standard_fee > 0 ? `₹${course.standard_fee}` : 'FREE'}</strong></span>
+          )}
+          {!isMahallu && activeBatch && (
+            <span>Intake: <strong>{activeBatch.batch_name}</strong></span>
           )}
           <span>Classes: <strong>{course.total_planned_classes} Sessions</strong></span>
           <span>Evaluation: <strong>{course.evaluation_type === 'NONE' ? 'No Exam / Open' : course.evaluation_type.replace('_', ' ')}</strong></span>
@@ -450,6 +458,17 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
                   ))}
                 </select>
               )}
+            </div>
+          )}
+
+          {/* Active Intake Batch Notification for Non-Mahallu Courses */}
+          {!isMahallu && activeBatch && (
+            <div style={{ marginBottom: '1.25rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 600, display: 'block' }}>Assigned Intake Batch:</span>
+                <strong style={{ fontSize: '0.95rem', color: '#15803d' }}>{activeBatch.batch_name}</strong>
+              </div>
+              <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>🟢 Admissions Open</span>
             </div>
           )}
 

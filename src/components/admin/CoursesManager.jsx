@@ -1,12 +1,32 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download, Building, Upload, Image as ImageIcon } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download, Building, Upload, Image as ImageIcon, Users, Layers, Search, Filter, X } from 'lucide-react';
 
 export const CoursesManager = () => {
-  const { courses, centres, enrollments, addCourse, updateCourse, toggleCourseStatus, toggleCentreCourseCompletion, showToast, setActiveRole } = useApp();
+  const {
+    courses,
+    centres,
+    enrollments,
+    resourcePersons,
+    addCourse,
+    updateCourse,
+    toggleCourseStatus,
+    toggleCentreCourseCompletion,
+    addCourseBatch,
+    updateBatchStatus,
+    assignRpToBatch,
+    showToast,
+    setActiveRole
+  } = useApp();
   const [filterCategory, setFilterCategory] = useState('ALL');
   const [showModal, setShowModal] = useState(false);
   const [editingCourseId, setEditingCourseId] = useState(null);
+
+  // Enrolled Students Modal State
+  const [selectedCourseForStudentsModal, setSelectedCourseForStudentsModal] = useState(null);
+  const [selectedCohortFilter, setSelectedCohortFilter] = useState('ALL');
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [studentFeeFilter, setStudentFeeFilter] = useState('ALL');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -312,6 +332,94 @@ export const CoursesManager = () => {
     showToast('Exported courses list to Excel (CSV)!');
   };
 
+  // Helper calculations for Course Students Modal
+  const currentModalCourse = selectedCourseForStudentsModal
+    ? courses.find(c => c.id === selectedCourseForStudentsModal.id) || selectedCourseForStudentsModal
+    : null;
+  const courseEnrollments = currentModalCourse
+    ? enrollments.filter(e => e.course_id === currentModalCourse.id)
+    : [];
+
+  const modalFilteredStudents = courseEnrollments.filter(e => {
+    // Cohort filter (Centre for Mahallu, Batch for others)
+    if (selectedCohortFilter !== 'ALL') {
+      if (currentModalCourse?.category === 'MAHALLU') {
+        if (e.centre_id !== selectedCohortFilter && e.centre_name !== selectedCohortFilter) return false;
+      } else {
+        if (e.batch_id !== selectedCohortFilter && e.batch_name !== selectedCohortFilter) return false;
+      }
+    }
+
+    // Fee Filter
+    if (studentFeeFilter === 'PAID') {
+      const isPaid = e.fee_status === 'PAID_TO_RP' || e.fee_status === 'OFFICE_CONFIRMED' || e.fee_status === 'FREE';
+      if (!isPaid) return false;
+    } else if (studentFeeFilter === 'PENDING') {
+      const isPaid = e.fee_status === 'PAID_TO_RP' || e.fee_status === 'OFFICE_CONFIRMED' || e.fee_status === 'FREE';
+      if (isPaid) return false;
+    }
+
+    // Search Query
+    if (studentSearchQuery) {
+      const q = studentSearchQuery.toLowerCase();
+      const matchName = e.student_name && e.student_name.toLowerCase().includes(q);
+      const matchPhone = e.account_phone && e.account_phone.includes(q);
+      const matchAdm = e.admission_number && e.admission_number.toLowerCase().includes(q);
+      if (!matchName && !matchPhone && !matchAdm) return false;
+    }
+
+    return true;
+  });
+
+  const handleExportCohortCSV = () => {
+    if (!currentModalCourse || modalFilteredStudents.length === 0) {
+      showToast('No students to export', 'warning');
+      return;
+    }
+
+    const headers = [
+      'Admission Number',
+      'Student Name',
+      'Mobile Number',
+      'Course Code',
+      'Course Title',
+      'Centre / Batch',
+      'Fee Status',
+      'Amount Paid (INR)',
+      'Classes Attended',
+      'Completion Status',
+      'Enrollment Date'
+    ];
+
+    const rows = modalFilteredStudents.map(e => [
+      `"${e.admission_number || ''}"`,
+      `"${(e.student_name || '').replace(/"/g, '""')}"`,
+      `"${e.account_phone || ''}"`,
+      `"${currentModalCourse.course_code || ''}"`,
+      `"${(currentModalCourse.title || '').replace(/"/g, '""')}"`,
+      `"${(e.centre_name || e.batch_name || 'General').replace(/"/g, '""')}"`,
+      `"${e.fee_status || ''}"`,
+      e.amount_paid || 0,
+      e.classes_attended || 0,
+      `"${e.completion_status || ''}"`,
+      `"${e.enrollment_date || ''}"`
+    ]);
+
+    const csvString = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    const cohortSlug = selectedCohortFilter !== 'ALL' ? `_${selectedCohortFilter}` : '';
+    link.setAttribute('download', `CPET_${(currentModalCourse.course_code || 'course').toLowerCase()}${cohortSlug}_students_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast(`Exported ${modalFilteredStudents.length} students to Excel (CSV)!`);
+  };
+
   return (
     <div>
       <div className="cpet-card-header">
@@ -462,112 +570,281 @@ export const CoursesManager = () => {
                 )}
               </div>
 
-              {/* Participating Centres & Batch Lifecycle Section */}
-              <div style={{ marginTop: '0.85rem', borderTop: '1px solid var(--cpet-border)', paddingTop: '0.75rem', background: '#f8fafc', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Building size={15} color="var(--cpet-primary)" />
-                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--cpet-primary)' }}>
-                      Centres & Batches ({
-                        centres.filter(c => 
-                          c.active_course_id === course.id || 
-                          (Array.isArray(c.course_ids) && c.course_ids.includes(course.id)) ||
-                          enrollments.some(e => e.course_id === course.id && e.centre_id === c.id)
-                        ).length
-                      })
-                    </span>
+              {/* Cohort Section: Participating Centres (Mahallu) OR Batches & Cohorts (Online / Language / Workshops) */}
+              {course.category === 'MAHALLU' ? (
+                <div style={{ marginTop: '0.85rem', borderTop: '1px solid var(--cpet-border)', paddingTop: '0.75rem', background: '#f8fafc', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Building size={15} color="var(--cpet-primary)" />
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--cpet-primary)' }}>
+                        Study Centres ({
+                          centres.filter(c => 
+                            c.active_course_id === course.id || 
+                            (Array.isArray(c.course_ids) && c.course_ids.includes(course.id)) ||
+                            enrollments.some(e => e.course_id === course.id && e.centre_id === c.id)
+                          ).length
+                        })
+                      </span>
+                    </div>
+
+                    {/* Course Global Status */}
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${course.status === 'COMPLETED' ? 'btn-secondary' : 'btn-outline'}`}
+                      style={{
+                        fontSize: '0.72rem',
+                        padding: '0.2rem 0.5rem',
+                        background: course.status === 'COMPLETED' ? '#e2e8f0' : 'white',
+                        color: course.status === 'COMPLETED' ? '#475569' : '#047857',
+                        borderColor: course.status === 'COMPLETED' ? '#94a3b8' : '#10b981'
+                      }}
+                      onClick={() => toggleCourseStatus(course.id)}
+                      title="Conclude or re-activate the entire course globally"
+                    >
+                      {course.status === 'COMPLETED' ? '🏁 Concluded (Reopen)' : '🏁 Conclude Course'}
+                    </button>
                   </div>
 
-                  {/* Course Global Status (For camps/workshops or global conclusion) */}
-                  <button
-                    type="button"
-                    className={`btn btn-sm ${course.status === 'COMPLETED' ? 'btn-secondary' : 'btn-outline'}`}
-                    style={{
-                      fontSize: '0.72rem',
-                      padding: '0.2rem 0.5rem',
-                      background: course.status === 'COMPLETED' ? '#e2e8f0' : 'white',
-                      color: course.status === 'COMPLETED' ? '#475569' : '#047857',
-                      borderColor: course.status === 'COMPLETED' ? '#94a3b8' : '#10b981'
-                    }}
-                    onClick={() => toggleCourseStatus(course.id)}
-                    title="Conclude or re-activate the entire course globally (useful for workshops and camps)"
-                  >
-                    {course.status === 'COMPLETED' ? '🏁 Concluded (Reopen)' : '🏁 Conclude Course'}
-                  </button>
-                </div>
+                  {course.status === 'COMPLETED' && (
+                    <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '4px', padding: '0.4rem 0.6rem', fontSize: '0.75rem', color: '#92400e', marginBottom: '0.5rem', fontWeight: 600 }}>
+                      🏁 Program concluded globally. Hidden from active RP portal.
+                    </div>
+                  )}
 
-                {course.status === 'COMPLETED' && (
-                  <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '4px', padding: '0.4rem 0.6rem', fontSize: '0.75rem', color: '#92400e', marginBottom: '0.5rem', fontWeight: 600 }}>
-                    🏁 Program concluded globally. Hidden from active RP portal.
-                  </div>
-                )}
-
-                {(() => {
-                  const participatingCentres = centres.filter(c => 
-                    c.active_course_id === course.id || 
-                    (Array.isArray(c.course_ids) && c.course_ids.includes(course.id)) ||
-                    enrollments.some(e => e.course_id === course.id && e.centre_id === c.id)
-                  );
-
-                  if (participatingCentres.length === 0) {
-                    return (
-                      <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0, fontStyle: 'italic' }}>
-                        No study centres currently attached to this course.
-                      </p>
+                  {(() => {
+                    const participatingCentres = centres.filter(c => 
+                      c.active_course_id === course.id || 
+                      (Array.isArray(c.course_ids) && c.course_ids.includes(course.id)) ||
+                      enrollments.some(e => e.course_id === course.id && e.centre_id === c.id)
                     );
-                  }
 
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
-                      {participatingCentres.map(c => {
-                        const isBatchCompleted = course.status === 'COMPLETED' || (c.completed_course_ids && c.completed_course_ids.includes(course.id));
-                        const enrolledCount = enrollments.filter(e => e.course_id === course.id && e.centre_id === c.id).length;
+                    if (participatingCentres.length === 0) {
+                      return (
+                        <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0, fontStyle: 'italic' }}>
+                          No study centres currently attached to this course.
+                        </p>
+                      );
+                    }
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
+                        {participatingCentres.map(c => {
+                          const isBatchCompleted = course.status === 'COMPLETED' || (c.completed_course_ids && c.completed_course_ids.includes(course.id));
+                          const enrolledCount = enrollments.filter(e => e.course_id === course.id && e.centre_id === c.id).length;
+
+                          return (
+                            <div
+                              key={c.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '0.45rem 0.65rem',
+                                borderRadius: '6px',
+                                background: isBatchCompleted ? '#f1f5f9' : 'white',
+                                border: `1px solid ${isBatchCompleted ? '#cbd5e1' : '#bbf7d0'}`,
+                                gap: '0.5rem'
+                              }}
+                            >
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <strong style={{ fontSize: '0.8rem', color: isBatchCompleted ? '#64748b' : 'var(--cpet-primary)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {c.centre_name} ({c.place})
+                                </strong>
+                                <span style={{ fontSize: '0.72rem', color: isBatchCompleted ? '#64748b' : '#059669', fontWeight: 600 }}>
+                                  {enrolledCount} students • {isBatchCompleted ? '🎓 Completed' : '🟢 Ongoing'}
+                                </span>
+                              </div>
+
+                              <button
+                                type="button"
+                                className={`btn btn-sm ${isBatchCompleted ? 'btn-secondary' : 'btn-outline'}`}
+                                style={{
+                                  fontSize: '0.7rem',
+                                  padding: '0.25rem 0.55rem',
+                                  whiteSpace: 'nowrap',
+                                  color: isBatchCompleted ? 'var(--cpet-text)' : '#0284c7',
+                                  borderColor: isBatchCompleted ? '#cbd5e1' : '#38bdf8'
+                                }}
+                                onClick={() => toggleCentreCourseCompletion(c.id, course.id)}
+                                title={isBatchCompleted ? "Re-activate this centre so it appears in RP active dropdowns" : "Mark completed & archive from RP active dropdowns"}
+                              >
+                                {isBatchCompleted ? 'Re-activate' : '🎓 Complete'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : (
+                /* Batches & Cohorts Section for Online, Language Academy, and Workshops */
+                <div style={{ marginTop: '0.85rem', borderTop: '1px solid var(--cpet-border)', paddingTop: '0.75rem', background: '#f8fafc', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Layers size={15} color="var(--cpet-primary)" />
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--cpet-primary)' }}>
+                        Batches & Cohorts ({course.batches?.length || 0})
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      onClick={() => addCourseBatch(course.id)}
+                      title="Create the next sequential intake batch and open admissions"
+                    >
+                      <Plus size={13} />
+                      <span>Open Next Batch</span>
+                    </button>
+                  </div>
+
+                  {(!course.batches || course.batches.length === 0) ? (
+                    <div style={{ padding: '0.5rem', background: '#ffffff', borderRadius: '6px', border: '1px dashed #cbd5e1', textAlign: 'center' }}>
+                      <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0 0 0.4rem 0' }}>
+                        No batches initialized yet. Default intake active.
+                      </p>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize: '0.72rem', padding: '0.2rem 0.6rem' }}
+                        onClick={() => addCourseBatch(course.id, 'Batch 1')}
+                      >
+                        + Initialize Batch 1
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '190px', overflowY: 'auto' }}>
+                      {course.batches.map(batch => {
+                        const batchStudentsCount = enrollments.filter(e => e.course_id === course.id && (e.batch_id === batch.id || e.batch_name === batch.batch_name)).length;
+                        const isOpen = batch.status === 'ADMISSIONS_OPEN';
+                        const isOngoing = batch.status === 'ONGOING';
+                        const isCompleted = batch.status === 'COMPLETED';
 
                         return (
                           <div
-                            key={c.id}
+                            key={batch.id}
                             style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '0.45rem 0.65rem',
+                              padding: '0.45rem 0.6rem',
                               borderRadius: '6px',
-                              background: isBatchCompleted ? '#f1f5f9' : 'white',
-                              border: `1px solid ${isBatchCompleted ? '#cbd5e1' : '#bbf7d0'}`,
-                              gap: '0.5rem'
+                              background: isCompleted ? '#f1f5f9' : 'white',
+                              border: `1px solid ${isOpen ? '#86efac' : isOngoing ? '#fde68a' : '#cbd5e1'}`,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.35rem'
                             }}
                           >
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <strong style={{ fontSize: '0.8rem', color: isBatchCompleted ? '#64748b' : 'var(--cpet-primary)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {c.centre_name} ({c.place})
-                              </strong>
-                              <span style={{ fontSize: '0.72rem', color: isBatchCompleted ? '#64748b' : '#059669', fontWeight: 600 }}>
-                                {enrolledCount} students • {isBatchCompleted ? '🎓 Batch Completed' : '🟢 Batch Ongoing'}
-                              </span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <strong style={{ fontSize: '0.8rem', color: isCompleted ? '#64748b' : 'var(--cpet-primary)' }}>
+                                  {batch.batch_name}
+                                </strong>
+                                <span
+                                  style={{
+                                    fontSize: '0.67rem',
+                                    fontWeight: 700,
+                                    padding: '0.1rem 0.35rem',
+                                    borderRadius: '4px',
+                                    background: isOpen ? '#dcfce7' : isOngoing ? '#fef3c7' : '#e2e8f0',
+                                    color: isOpen ? '#166534' : isOngoing ? '#92400e' : '#475569'
+                                  }}
+                                >
+                                  {isOpen ? '🟢 Intake Open' : isOngoing ? '🟡 Classes Ongoing' : '🏁 Concluded'}
+                                </span>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                {isOpen && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline"
+                                    style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem', borderColor: '#f59e0b', color: '#d97706' }}
+                                    onClick={() => updateBatchStatus(course.id, batch.id, 'ONGOING')}
+                                    title="Close intake for this batch and start ongoing classes"
+                                  >
+                                    ▶ Start Classes
+                                  </button>
+                                )}
+                                {isOngoing && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline"
+                                    style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem', borderColor: '#64748b', color: '#475569' }}
+                                    onClick={() => updateBatchStatus(course.id, batch.id, 'COMPLETED')}
+                                    title="Conclude and archive this batch"
+                                  >
+                                    🏁 Conclude
+                                  </button>
+                                )}
+                                {isCompleted && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-secondary"
+                                    style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem' }}
+                                    onClick={() => updateBatchStatus(course.id, batch.id, 'ONGOING')}
+                                    title="Re-open classes for this batch"
+                                  >
+                                    Re-open
+                                  </button>
+                                )}
+                              </div>
                             </div>
 
-                            <button
-                              type="button"
-                              className={`btn btn-sm ${isBatchCompleted ? 'btn-secondary' : 'btn-outline'}`}
-                              style={{
-                                fontSize: '0.7rem',
-                                padding: '0.25rem 0.55rem',
-                                whiteSpace: 'nowrap',
-                                color: isBatchCompleted ? 'var(--cpet-text)' : '#0284c7',
-                                borderColor: isBatchCompleted ? '#cbd5e1' : '#38bdf8'
-                              }}
-                              onClick={() => toggleCentreCourseCompletion(c.id, course.id)}
-                              title={isBatchCompleted ? "Re-activate this batch so it appears in RP active dropdowns" : "Mark completed & archive from RP active dropdowns"}
-                            >
-                              {isBatchCompleted ? 'Re-activate' : '🎓 Mark Complete'}
-                            </button>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: '#64748b' }}>
+                              <span>👥 {batchStudentsCount} enrolled</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span>Teacher:</span>
+                                <select
+                                  style={{ fontSize: '0.68rem', padding: '0.1rem 0.25rem', borderRadius: '4px', border: '1px solid #cbd5e1', maxWidth: '125px' }}
+                                  value={batch.assigned_rp_id || ''}
+                                  onChange={(e) => {
+                                    const rpId = e.target.value;
+                                    const rp = resourcePersons.find(r => r.id === rpId);
+                                    assignRpToBatch(course.id, batch.id, rpId, rp?.full_name || '');
+                                  }}
+                                >
+                                  <option value="">Unassigned</option>
+                                  {resourcePersons.map(rp => (
+                                    <option key={rp.id} value={rp.id}>{rp.full_name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
                     </div>
-                  );
-                })()}
-              </div>
+                  )}
+                </div>
+              )}
+
+              {/* View Enrolled Students Modal Trigger */}
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                style={{
+                  width: '100%',
+                  marginTop: '0.65rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  fontWeight: 700,
+                  color: 'var(--cpet-primary)',
+                  borderColor: 'var(--cpet-primary)',
+                  background: '#f0fdf4'
+                }}
+                onClick={() => {
+                  setSelectedCourseForStudentsModal(course);
+                  setSelectedCohortFilter('ALL');
+                  setStudentSearchQuery('');
+                  setStudentFeeFilter('ALL');
+                }}
+              >
+                <Users size={15} />
+                <span>View Enrolled Students ({enrollments.filter(e => e.course_id === course.id).length})</span>
+              </button>
             </div>
 
             {/* Actions Footer */}
@@ -626,6 +903,235 @@ export const CoursesManager = () => {
           </div>
         ))}
       </div>
+
+      {/* Enrolled Students Modal */}
+      {selectedCourseForStudentsModal && (
+        <div className="modal-overlay" onClick={() => setSelectedCourseForStudentsModal(null)}>
+          <div
+            className="modal-content"
+            style={{ maxWidth: '960px', width: '95%', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="modal-header" style={{ paddingBottom: '0.5rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, color: 'var(--cpet-primary)' }}>
+                    {currentModalCourse?.title}
+                  </h3>
+                  <span className="badge badge-neutral" style={{ fontSize: '0.75rem' }}>
+                    {currentModalCourse?.course_code}
+                  </span>
+                  <span className={`badge ${getCategoryBadgeClass(currentModalCourse?.category)}`} style={{ fontSize: '0.75rem' }}>
+                    {getCategoryLabel(currentModalCourse?.category)}
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                  Course-specific Student Roster & Cohort Management
+                </p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setSelectedCourseForStudentsModal(null)}>✕</button>
+            </div>
+
+            {/* Stats Summary Strip */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', padding: '0.75rem 1rem', background: '#f8fafc', borderBottom: '1px solid var(--cpet-border)' }}>
+              <div>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Total Enrolled</span>
+                <strong style={{ fontSize: '1.15rem', color: 'var(--cpet-primary)' }}>{courseEnrollments.length}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Showing Filtered</span>
+                <strong style={{ fontSize: '1.15rem', color: '#0284c7' }}>{modalFilteredStudents.length}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Fees Collected</span>
+                <strong style={{ fontSize: '1.15rem', color: '#16a34a' }}>
+                  ₹{modalFilteredStudents.reduce((acc, curr) => acc + (Number(curr.amount_paid) || 0), 0).toLocaleString()}
+                </strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Fee Status Breakdown</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                  <span style={{ color: '#16a34a' }}>
+                    {modalFilteredStudents.filter(e => e.fee_status === 'PAID_TO_RP' || e.fee_status === 'OFFICE_CONFIRMED' || e.fee_status === 'FREE').length} Paid
+                  </span>
+                  {' • '}
+                  <span style={{ color: '#dc2626' }}>
+                    {modalFilteredStudents.filter(e => e.fee_status !== 'PAID_TO_RP' && e.fee_status !== 'OFFICE_CONFIRMED' && e.fee_status !== 'FREE').length} Due
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            {/* Filter Toolbar */}
+            <div style={{ display: 'flex', gap: '0.6rem', padding: '0.75rem 1rem', borderBottom: '1px solid var(--cpet-border)', flexWrap: 'wrap', alignItems: 'center', background: 'white' }}>
+              {/* Cohort Selector (Centres vs Batches) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Filter size={15} color="#64748b" />
+                <select
+                  className="form-select"
+                  style={{ fontSize: '0.82rem', padding: '0.35rem 0.6rem', minWidth: '180px' }}
+                  value={selectedCohortFilter}
+                  onChange={e => setSelectedCohortFilter(e.target.value)}
+                >
+                  <option value="ALL">
+                    {currentModalCourse?.category === 'MAHALLU' ? 'All Study Centres' : 'All Batches'} ({courseEnrollments.length})
+                  </option>
+                  {currentModalCourse?.category === 'MAHALLU' ? (
+                    centres
+                      .filter(c =>
+                        c.active_course_id === currentModalCourse.id ||
+                        (Array.isArray(c.course_ids) && c.course_ids.includes(currentModalCourse.id)) ||
+                        enrollments.some(e => e.course_id === currentModalCourse.id && e.centre_id === c.id)
+                      )
+                      .map(c => {
+                        const count = courseEnrollments.filter(e => e.centre_id === c.id).length;
+                        return (
+                          <option key={c.id} value={c.id}>
+                            {c.centre_name} ({count})
+                          </option>
+                        );
+                      })
+                  ) : (
+                    (currentModalCourse?.batches || []).map(b => {
+                      const count = courseEnrollments.filter(e => e.batch_id === b.id || e.batch_name === b.batch_name).length;
+                      return (
+                        <option key={b.id} value={b.id}>
+                          {b.batch_name} ({count})
+                        </option>
+                      );
+                    })
+                  )}
+                </select>
+              </div>
+
+              {/* Fee Status Filter */}
+              <select
+                className="form-select"
+                style={{ fontSize: '0.82rem', padding: '0.35rem 0.6rem', width: '130px' }}
+                value={studentFeeFilter}
+                onChange={e => setStudentFeeFilter(e.target.value)}
+              >
+                <option value="ALL">All Fees</option>
+                <option value="PAID">Paid Only</option>
+                <option value="PENDING">Pending Only</option>
+              </select>
+
+              {/* Search Input */}
+              <div style={{ flex: 1, minWidth: '180px', position: 'relative' }}>
+                <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="text"
+                  className="form-input"
+                  style={{ fontSize: '0.82rem', padding: '0.35rem 0.6rem 0.35rem 2rem' }}
+                  placeholder="Search student name, phone, admission..."
+                  value={studentSearchQuery}
+                  onChange={e => setStudentSearchQuery(e.target.value)}
+                />
+              </div>
+
+              {/* Export Cohort CSV Button */}
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                onClick={handleExportCohortCSV}
+              >
+                <Download size={14} />
+                Export Cohort ({modalFilteredStudents.length})
+              </button>
+            </div>
+
+            {/* Students Table */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 1rem' }}>
+              {modalFilteredStudents.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b' }}>
+                  <Users size={36} color="#cbd5e1" style={{ margin: '0 auto 0.75rem auto' }} />
+                  <h4 style={{ margin: '0 0 0.25rem 0', color: '#334155' }}>No students found</h4>
+                  <p style={{ margin: 0, fontSize: '0.82rem' }}>
+                    No enrollments match your selected cohort, fee, or search criteria.
+                  </p>
+                </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="cpet-table" style={{ fontSize: '0.82rem' }}>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Admission No</th>
+                        <th>Student Name</th>
+                        <th>Contact</th>
+                        <th>{currentModalCourse?.category === 'MAHALLU' ? 'Study Centre' : 'Batch / Cohort'}</th>
+                        <th>Attendance</th>
+                        <th>Fee Status</th>
+                        <th>Enrolled On</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {modalFilteredStudents.map((enr, idx) => {
+                        const isPaid = enr.fee_status === 'PAID_TO_RP' || enr.fee_status === 'OFFICE_CONFIRMED' || enr.fee_status === 'FREE';
+
+                        return (
+                          <tr key={enr.id || idx}>
+                            <td>{idx + 1}</td>
+                            <td>
+                              <strong style={{ fontFamily: 'monospace', color: 'var(--cpet-primary)' }}>
+                                {enr.admission_number}
+                              </strong>
+                            </td>
+                            <td>
+                              <strong style={{ color: 'var(--cpet-text)' }}>{enr.student_name}</strong>
+                            </td>
+                            <td>
+                              <a href={`tel:${enr.account_phone}`} style={{ color: '#0284c7', textDecoration: 'none' }}>
+                                +91 {enr.account_phone}
+                              </a>
+                            </td>
+                            <td>
+                              <span className="badge badge-neutral" style={{ fontSize: '0.72rem' }}>
+                                {enr.centre_name || enr.batch_name || 'General Cohort'}
+                              </span>
+                            </td>
+                            <td>
+                              <span>
+                                {enr.classes_attended || 0} / {currentModalCourse?.total_planned_classes || 0}
+                                {currentModalCourse?.total_planned_classes > 0 && (
+                                  <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: '4px' }}>
+                                    ({Math.round(((enr.classes_attended || 0) / currentModalCourse.total_planned_classes) * 100)}%)
+                                  </span>
+                                )}
+                              </span>
+                            </td>
+                            <td>
+                              <span
+                                className={`badge ${isPaid ? 'badge-success' : 'badge-danger'}`}
+                                style={{ fontSize: '0.72rem' }}
+                              >
+                                {isPaid ? `Paid (₹${enr.amount_paid || currentModalCourse?.standard_fee || 0})` : 'Pending'}
+                              </span>
+                            </td>
+                            <td style={{ color: '#64748b', fontSize: '0.75rem' }}>
+                              {enr.enrollment_date || 'N/A'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer" style={{ padding: '0.75rem 1rem', borderTop: '1px solid var(--cpet-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                Showing {modalFilteredStudents.length} of {courseEnrollments.length} total enrolled students
+              </span>
+              <button className="btn btn-secondary btn-sm" onClick={() => setSelectedCourseForStudentsModal(null)}>
+                Close Roster
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create / Edit Modal */}
       {showModal && (

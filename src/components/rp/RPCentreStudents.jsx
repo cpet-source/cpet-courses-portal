@@ -43,10 +43,14 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
     }
   });
 
-  const mahalluCourses = baseCourses.filter(c => c.category === 'MAHALLU');
-  const availableCourses = mahalluCourses.length > 0 ? mahalluCourses : baseCourses;
+  const [courseCategoryFilter, setCourseCategoryFilter] = useState('ALL');
+  const availableCourses = baseCourses.filter(c => {
+    if (courseCategoryFilter === 'ALL') return true;
+    return c.category === courseCategoryFilter;
+  });
 
   const [selectedCourseId, setSelectedCourseId] = useState(availableCourses[0]?.id || '');
+  const [selectedBatchId, setSelectedBatchId] = useState('ALL');
 
   // Keep selectedCourseId valid when courses load or viewMode changes
   useEffect(() => {
@@ -98,6 +102,7 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
   // Add Student Modal Chained State
   const [modalCourseId, setModalCourseId] = useState(selectedCourseId || availableCourses[0]?.id || '');
   const [modalCentreId, setModalCentreId] = useState(selectedCentreId || '');
+  const [modalBatchId, setModalBatchId] = useState('batch-1');
 
   // Compute available active centres for the course selected inside modal
   const modalCentresForCourse = centres.filter(c => {
@@ -112,14 +117,20 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
   // Keep modal centre in sync when modal course changes
   const handleModalCourseChange = (newCourseId) => {
     setModalCourseId(newCourseId);
-    const availableForNewCourse = centres.filter(c => {
-      if (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(newCourseId)) return false;
-      const isDirect = c.active_course_id === newCourseId;
-      const inList = Array.isArray(c.course_ids) && c.course_ids.includes(newCourseId);
-      const hasStudents = enrollments.some(e => e.course_id === newCourseId && e.centre_id === c.id);
-      return isDirect || inList || hasStudents;
-    });
-    setModalCentreId(availableForNewCourse[0]?.id || '');
+    const targetCrs = courses.find(c => c.id === newCourseId);
+    if (targetCrs?.category === 'MAHALLU') {
+      const availableForNewCourse = centres.filter(c => {
+        if (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(newCourseId)) return false;
+        const isDirect = c.active_course_id === newCourseId;
+        const inList = Array.isArray(c.course_ids) && c.course_ids.includes(newCourseId);
+        const hasStudents = enrollments.some(e => e.course_id === newCourseId && e.centre_id === c.id);
+        return isDirect || inList || hasStudents;
+      });
+      setModalCentreId(availableForNewCourse[0]?.id || '');
+    } else {
+      const activeBatch = targetCrs?.batches?.find(b => b.status === 'ADMISSIONS_OPEN' || b.status === 'ONGOING') || targetCrs?.batches?.[0];
+      setModalBatchId(activeBatch?.id || 'batch-1');
+    }
   };
 
   // Student Phone Lookup state
@@ -142,6 +153,8 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
   const openAddStudentModal = () => {
     setModalCourseId(selectedCourseId || availableCourses[0]?.id || '');
     setModalCentreId(selectedCentreId || centresForCourse[0]?.id || '');
+    const activeBatch = selectedCourse?.batches?.find(b => b.status === 'ADMISSIONS_OPEN' || b.status === 'ONGOING') || selectedCourse?.batches?.[0];
+    setModalBatchId(selectedBatchId !== 'ALL' && selectedBatchId ? selectedBatchId : (activeBatch?.id || 'batch-1'));
     setPhoneInput('');
     setLookupResult(null);
     setHasSearchedPhone(false);
@@ -156,9 +169,15 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
     setShowAddStudentModal(true);
   };
 
-  // Filter students in current (Course, Centre)
+  // Filter students in current (Course, Centre or Batch)
   const batchStudents = enrollments.filter(e => {
-    return e.course_id === selectedCourseId && e.centre_id === selectedCentreId;
+    if (e.course_id !== selectedCourseId) return false;
+    if (selectedCourse?.category === 'MAHALLU') {
+      return e.centre_id === selectedCentreId;
+    } else {
+      if (!selectedBatchId || selectedBatchId === 'ALL') return true;
+      return e.batch_id === selectedBatchId || e.batch_name === selectedBatchId;
+    }
   });
 
   const filteredStudents = batchStudents.filter(e => {
@@ -191,30 +210,36 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
   // Submit Enrollment
   const handleEnrollSubmit = (e) => {
     e.preventDefault();
+    const courseObj = courses.find(c => c.id === modalCourseId);
+    const isMahallu = courseObj?.category === 'MAHALLU';
+
     if (!modalCourseId) {
       showToast('Please select a course', 'danger');
       return;
     }
-    if (!modalCentreId) {
+    if (isMahallu && !modalCentreId) {
       showToast('Please select a study centre for this course', 'danger');
       return;
     }
-
-    const courseObj = courses.find(c => c.id === modalCourseId);
 
     registerOrEnrollStudent({
       phone: phoneInput,
       existingMemberId: selectedMemberId,
       newMemberData: newMemberForm,
       courseId: modalCourseId,
-      centreId: modalCentreId,
+      centreId: isMahallu ? modalCentreId : null,
+      batchId: !isMahallu ? modalBatchId : null,
       feeStatus: 'PAID_TO_RP',
       amountPaid: courseObj?.standard_fee || 0
     });
 
-    // Automatically navigate view to this course & centre so RP sees the new student
+    // Automatically navigate view to this course & centre/batch so RP sees the new student
     setSelectedCourseId(modalCourseId);
-    setSelectedCentreId(modalCentreId);
+    if (isMahallu) {
+      setSelectedCentreId(modalCentreId);
+    } else {
+      setSelectedBatchId(modalBatchId || 'ALL');
+    }
 
     setShowAddStudentModal(false);
     setPhoneInput('');
@@ -316,23 +341,61 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
         )}
       </div>
 
-      {/* STEP 1: Mahallu Course Selector */}
+      {/* STEP 1: Course Selector with Category Tabs */}
+      <div className="cpet-tabs" style={{ marginBottom: '0.85rem' }}>
+        <button
+          type="button"
+          className={`tab-btn ${courseCategoryFilter === 'ALL' ? 'active' : ''}`}
+          onClick={() => setCourseCategoryFilter('ALL')}
+        >
+          All Programs
+        </button>
+        <button
+          type="button"
+          className={`tab-btn ${courseCategoryFilter === 'MAHALLU' ? 'active' : ''}`}
+          onClick={() => setCourseCategoryFilter('MAHALLU')}
+        >
+          Mahallu Study Centres
+        </button>
+        <button
+          type="button"
+          className={`tab-btn ${courseCategoryFilter === 'ONLINE' ? 'active' : ''}`}
+          onClick={() => setCourseCategoryFilter('ONLINE')}
+        >
+          Online Courses
+        </button>
+        <button
+          type="button"
+          className={`tab-btn ${courseCategoryFilter === 'LANGUAGE_ACADEMY' ? 'active' : ''}`}
+          onClick={() => setCourseCategoryFilter('LANGUAGE_ACADEMY')}
+        >
+          Language Academy
+        </button>
+        <button
+          type="button"
+          className={`tab-btn ${courseCategoryFilter === 'OFFLINE_WORKSHOP' ? 'active' : ''}`}
+          onClick={() => setCourseCategoryFilter('OFFLINE_WORKSHOP')}
+        >
+          Workshops / Camps
+        </button>
+      </div>
+
       <div className="cpet-card" style={{ marginBottom: '1.25rem', padding: '1rem 1.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cpet-primary)', background: '#e0e7ff', padding: '3px 8px', borderRadius: '4px' }}>
               Step 1
             </span>
-            <strong style={{ fontSize: '0.95rem', color: '#1e293b' }}>Select Mahallu Course:</strong>
+            <strong style={{ fontSize: '0.95rem', color: '#1e293b' }}>Select Course / Program:</strong>
           </div>
           <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-            {availableCourses.length} Mahallu Course{availableCourses.length !== 1 ? 's' : ''} available
+            {availableCourses.length} Program{availableCourses.length !== 1 ? 's' : ''} available
           </span>
         </div>
 
         {availableCourses.length === 0 ? (
           <div style={{ padding: '1.5rem', textAlign: 'center', background: '#f8fafc', borderRadius: 'var(--radius-md)', color: '#64748b' }}>
-            No Mahallu courses configured yet. Please ask Super Admin to create a course first.
+            No courses found under this category filter.
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}>
@@ -362,9 +425,14 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: isSelected ? 'var(--cpet-primary)' : '#64748b', background: isSelected ? '#dbeafe' : '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
-                      {course.course_code || 'COURSE'}
-                    </span>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: isSelected ? 'var(--cpet-primary)' : '#64748b', background: isSelected ? '#dbeafe' : '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
+                        {course.course_code || 'COURSE'}
+                      </span>
+                      <span style={{ fontSize: '0.67rem', color: '#64748b' }}>
+                        [{course.category === 'MAHALLU' ? 'Mahallu' : course.category?.replace(/_/g, ' ')}]
+                      </span>
+                    </div>
                     <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--cpet-accent)' }}>
                       {course.standard_fee > 0 ? `₹${course.standard_fee}` : 'FREE'}
                     </span>
@@ -375,7 +443,11 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
                   </h4>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.75rem', color: '#64748b' }}>
-                    <span>🏛️ <strong>{courseCentres.length}</strong> {courseCentres.length === 1 ? 'Centre' : 'Centres'}</span>
+                    {course.category === 'MAHALLU' ? (
+                      <span>🏛️ <strong>{courseCentres.length}</strong> {courseCentres.length === 1 ? 'Centre' : 'Centres'}</span>
+                    ) : (
+                      <span>🏷️ <strong>{course.batches?.length || 1}</strong> {course.batches?.length === 1 ? 'Batch' : 'Batches'}</span>
+                    )}
                     <span>•</span>
                     <span>👥 <strong>{courseEnrolledCount}</strong> Students</span>
                   </div>
@@ -386,109 +458,209 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
         )}
       </div>
 
-      {/* STEP 2: Centres Under Selected Course */}
+      {/* STEP 2: Centres (Mahallu) OR Batches (Online / Language / Workshops) */}
       {selectedCourse && (
         <div className="cpet-card" style={{ marginBottom: '1.25rem', padding: '1rem 1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cpet-primary)', background: '#e0e7ff', padding: '3px 8px', borderRadius: '4px' }}>
-                Step 2
-              </span>
-              <strong style={{ fontSize: '0.95rem', color: '#1e293b' }}>
-                Centres Offering "{selectedCourse.title}":
-              </strong>
-            </div>
-            <div style={{ display: 'flex', gap: '0.4rem' }}>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => setShowAttachCentreModal(true)}
-                title="Launch this course at an existing centre"
-              >
-                + Launch at Existing Centre
-              </button>
-              {onNavigateToNewCentre && (
-                <button
-                  className="btn btn-outline btn-sm"
-                  onClick={onNavigateToNewCentre}
-                  title="Register completely new centre"
-                >
-                  + New Centre Form
-                </button>
-              )}
-            </div>
-          </div>
-
-          {centresForCourse.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem 1.5rem', background: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px dashed var(--cpet-border)' }}>
-              <AlertCircle size={32} style={{ color: '#94a3b8', margin: '0 auto 0.5rem' }} />
-              <h4 style={{ fontSize: '0.95rem', color: '#1e293b', marginBottom: '0.35rem' }}>
-                No Study Centres currently offering this course
-              </h4>
-              <p style={{ fontSize: '0.82rem', color: '#64748b', maxWidth: '480px', margin: '0 auto 1rem' }}>
-                A Mahallu centre that completed its first course can now launch <strong>{selectedCourse.title}</strong> as its next batch!
-              </p>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <button className="btn btn-primary btn-sm" onClick={() => setShowAttachCentreModal(true)}>
-                  <Plus size={14} /> Launch at an Existing Centre
-                </button>
-                {onNavigateToNewCentre && (
-                  <button className="btn btn-secondary btn-sm" onClick={onNavigateToNewCentre}>
-                    <Building size={14} /> Register New Centre
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              {centresForCourse.map(centre => {
-                const isSelected = centre.id === selectedCentreId;
-                const centreStudentsInCourse = enrollments.filter(
-                  e => e.course_id === selectedCourseId && e.centre_id === centre.id
-                ).length;
-
-                return (
+          {selectedCourse.category === 'MAHALLU' ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cpet-primary)', background: '#e0e7ff', padding: '3px 8px', borderRadius: '4px' }}>
+                    Step 2
+                  </span>
+                  <strong style={{ fontSize: '0.95rem', color: '#1e293b' }}>
+                    Centres Offering "{selectedCourse.title}":
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
                   <button
-                    key={centre.id}
-                    onClick={() => setSelectedCentreId(centre.id)}
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setShowAttachCentreModal(true)}
+                    title="Launch this course at an existing centre"
+                  >
+                    + Launch at Existing Centre
+                  </button>
+                  {onNavigateToNewCentre && (
+                    <button
+                      className="btn btn-outline btn-sm"
+                      onClick={onNavigateToNewCentre}
+                      title="Register completely new centre"
+                    >
+                      + New Centre Form
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {centresForCourse.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem 1.5rem', background: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px dashed var(--cpet-border)' }}>
+                  <AlertCircle size={32} style={{ color: '#94a3b8', margin: '0 auto 0.5rem' }} />
+                  <h4 style={{ fontSize: '0.95rem', color: '#1e293b', marginBottom: '0.35rem' }}>
+                    No Study Centres currently offering this course
+                  </h4>
+                  <p style={{ fontSize: '0.82rem', color: '#64748b', maxWidth: '480px', margin: '0 auto 1rem' }}>
+                    A Mahallu centre that completed its first course can now launch <strong>{selectedCourse.title}</strong> as its next batch!
+                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button className="btn btn-primary btn-sm" onClick={() => setShowAttachCentreModal(true)}>
+                      <Plus size={14} /> Launch at an Existing Centre
+                    </button>
+                    {onNavigateToNewCentre && (
+                      <button className="btn btn-secondary btn-sm" onClick={onNavigateToNewCentre}>
+                        <Building size={14} /> Register New Centre
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {centresForCourse.map(centre => {
+                    const isSelected = centre.id === selectedCentreId;
+                    const centreStudentsInCourse = enrollments.filter(
+                      e => e.course_id === selectedCourseId && e.centre_id === centre.id
+                    ).length;
+
+                    return (
+                      <button
+                        key={centre.id}
+                        onClick={() => setSelectedCentreId(centre.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.55rem 0.9rem',
+                          borderRadius: 'var(--radius-md)',
+                          border: isSelected ? '2px solid var(--cpet-primary)' : '1px solid var(--cpet-border)',
+                          background: isSelected ? 'var(--cpet-primary)' : 'white',
+                          color: isSelected ? 'white' : 'var(--cpet-primary)',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          fontSize: '0.85rem',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <Building size={14} />
+                        <span>{centre.centre_name} ({centre.place})</span>
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '10px',
+                            background: isSelected ? 'rgba(255, 255, 255, 0.25)' : '#e0e7ff',
+                            color: isSelected ? 'white' : 'var(--cpet-primary)'
+                          }}
+                        >
+                          {centreStudentsInCourse}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Batch Selector for Online / Language / Workshops */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cpet-primary)', background: '#e0e7ff', padding: '3px 8px', borderRadius: '4px' }}>
+                    Step 2
+                  </span>
+                  <strong style={{ fontSize: '0.95rem', color: '#1e293b' }}>
+                    Batches & Cohorts for "{selectedCourse.title}":
+                  </strong>
+                </div>
+              </div>
+
+              {(!selectedCourse.batches || selectedCourse.batches.length === 0) ? (
+                <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: 'var(--radius-md)', color: '#64748b', fontSize: '0.85rem' }}>
+                  Showing all enrolled students ({enrollments.filter(e => e.course_id === selectedCourseId).length}).
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button
+                    onClick={() => setSelectedBatchId('ALL')}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem',
                       padding: '0.55rem 0.9rem',
                       borderRadius: 'var(--radius-md)',
-                      border: isSelected ? '2px solid var(--cpet-primary)' : '1px solid var(--cpet-border)',
-                      background: isSelected ? 'var(--cpet-primary)' : 'white',
-                      color: isSelected ? 'white' : 'var(--cpet-primary)',
+                      border: selectedBatchId === 'ALL' ? '2px solid var(--cpet-primary)' : '1px solid var(--cpet-border)',
+                      background: selectedBatchId === 'ALL' ? 'var(--cpet-primary)' : 'white',
+                      color: selectedBatchId === 'ALL' ? 'white' : 'var(--cpet-primary)',
                       cursor: 'pointer',
                       fontWeight: 600,
-                      fontSize: '0.85rem',
-                      transition: 'all 0.15s ease'
+                      fontSize: '0.85rem'
                     }}
                   >
-                    <Building size={14} />
-                    <span>{centre.centre_name} ({centre.place})</span>
+                    <Layers size={14} />
+                    <span>All Batches</span>
                     <span
                       style={{
                         fontSize: '0.72rem',
-                        fontWeight: 700,
                         padding: '1px 6px',
                         borderRadius: '10px',
-                        background: isSelected ? 'rgba(255, 255, 255, 0.25)' : '#e0e7ff',
-                        color: isSelected ? 'white' : 'var(--cpet-primary)'
+                        background: selectedBatchId === 'ALL' ? 'rgba(255, 255, 255, 0.25)' : '#e0e7ff',
+                        color: selectedBatchId === 'ALL' ? 'white' : 'var(--cpet-primary)',
+                        fontWeight: 700
                       }}
                     >
-                      {centreStudentsInCourse}
+                      {enrollments.filter(e => e.course_id === selectedCourseId).length}
                     </span>
                   </button>
-                );
-              })}
-            </div>
+
+                  {selectedCourse.batches.map(batch => {
+                    const isSelected = selectedBatchId === batch.id;
+                    const batchStudentsCount = enrollments.filter(
+                      e => e.course_id === selectedCourseId && (e.batch_id === batch.id || e.batch_name === batch.batch_name)
+                    ).length;
+
+                    return (
+                      <button
+                        key={batch.id}
+                        onClick={() => setSelectedBatchId(batch.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.55rem 0.9rem',
+                          borderRadius: 'var(--radius-md)',
+                          border: isSelected ? '2px solid var(--cpet-primary)' : '1px solid var(--cpet-border)',
+                          background: isSelected ? 'var(--cpet-primary)' : 'white',
+                          color: isSelected ? 'white' : 'var(--cpet-primary)',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        <Layers size={14} />
+                        <span>{batch.batch_name}</span>
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            padding: '1px 6px',
+                            borderRadius: '10px',
+                            background: isSelected ? 'rgba(255, 255, 255, 0.25)' : '#e0e7ff',
+                            color: isSelected ? 'white' : 'var(--cpet-primary)',
+                            fontWeight: 700
+                          }}
+                        >
+                          {batchStudentsCount}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
 
       {/* STEP 3: Student Roster & Evaluation */}
-      {selectedCourse && selectedCentre && (
+      {selectedCourse && (selectedCourse.category === 'MAHALLU' ? selectedCentre : true) && (
         <div>
           {/* Active Batch Summary Banner */}
           <div
@@ -513,10 +685,18 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
                 </h3>
               </div>
               <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
-                Centre: <strong>{selectedCentre.centre_name}</strong> ({selectedCentre.place}, {selectedCentre.district})
-                {selectedCentre.committee_president_phone && ` | Pres: ${selectedCentre.committee_president_phone}`}
-                {selectedCentre.committee_secretary_phone && ` | Sec: ${selectedCentre.committee_secretary_phone}`}
-                {selectedCentre.course_coordinator_phone && ` | Coord: ${selectedCentre.course_coordinator_name ? selectedCentre.course_coordinator_name + ' (' + selectedCentre.course_coordinator_phone + ')' : selectedCentre.course_coordinator_phone}`}
+                {selectedCourse.category === 'MAHALLU' && selectedCentre ? (
+                  <>
+                    Centre: <strong>{selectedCentre.centre_name}</strong> ({selectedCentre.place}, {selectedCentre.district})
+                    {selectedCentre.committee_president_phone && ` | Pres: ${selectedCentre.committee_president_phone}`}
+                    {selectedCentre.committee_secretary_phone && ` | Sec: ${selectedCentre.committee_secretary_phone}`}
+                    {selectedCentre.course_coordinator_phone && ` | Coord: ${selectedCentre.course_coordinator_name ? selectedCentre.course_coordinator_name + ' (' + selectedCentre.course_coordinator_phone + ')' : selectedCentre.course_coordinator_phone}`}
+                  </>
+                ) : (
+                  <>
+                    Intake Cohort: <strong>{selectedBatchId === 'ALL' ? 'All Batches' : (selectedCourse?.batches?.find(b => b.id === selectedBatchId)?.batch_name || 'Batch 1')}</strong>
+                  </>
+                )}
               </p>
             </div>
 
@@ -662,34 +842,67 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
                   </select>
                 </div>
 
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
-                    2. Select Study Centre (Under this Course): <span className="required">*</span>
-                  </label>
-                  {modalCentresForCourse.length === 0 ? (
-                    <div>
-                      <select className="form-select" disabled>
-                        <option>No study centres currently offer this course</option>
+                {(() => {
+                  const targetCrs = courses.find(c => c.id === modalCourseId);
+                  const isMahallu = targetCrs?.category === 'MAHALLU';
+
+                  if (isMahallu) {
+                    return (
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                          2. Select Study Centre (Under this Course): <span className="required">*</span>
+                        </label>
+                        {modalCentresForCourse.length === 0 ? (
+                          <div>
+                            <select className="form-select" disabled>
+                              <option>No study centres currently offer this course</option>
+                            </select>
+                            <p style={{ fontSize: '0.78rem', color: '#dc2626', marginTop: '0.35rem' }}>
+                              Please launch this course at an existing centre first using "+ Launch Course at Centre".
+                            </p>
+                          </div>
+                        ) : (
+                          <select
+                            className="form-select"
+                            value={modalCentreId}
+                            onChange={e => setModalCentreId(e.target.value)}
+                            style={{ fontWeight: 600 }}
+                          >
+                            {modalCentresForCourse.map(c => (
+                              <option key={c.id} value={c.id}>
+                                {c.centre_name} ({c.place}, {c.district})
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                        2. Select Intake Batch: <span className="required">*</span>
+                      </label>
+                      <select
+                        className="form-select"
+                        value={modalBatchId}
+                        onChange={e => setModalBatchId(e.target.value)}
+                        style={{ fontWeight: 600 }}
+                      >
+                        {(!targetCrs?.batches || targetCrs.batches.length === 0) ? (
+                          <option value="batch-1">Batch 1 (Main Cohort)</option>
+                        ) : (
+                          targetCrs.batches.map(b => (
+                            <option key={b.id} value={b.id}>
+                              {b.batch_name} [{b.status.replace(/_/g, ' ')}]
+                            </option>
+                          ))
+                        )}
                       </select>
-                      <p style={{ fontSize: '0.78rem', color: '#dc2626', marginTop: '0.35rem' }}>
-                        Please launch this course at an existing centre first using "+ Launch Course at Centre".
-                      </p>
                     </div>
-                  ) : (
-                    <select
-                      className="form-select"
-                      value={modalCentreId}
-                      onChange={e => setModalCentreId(e.target.value)}
-                      style={{ fontWeight: 600 }}
-                    >
-                      {modalCentresForCourse.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.centre_name} ({c.place}, {c.district})
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
 
               {/* Phone Lookup Step */}

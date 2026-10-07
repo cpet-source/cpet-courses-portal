@@ -31,6 +31,12 @@ export const StudentHub = () => {
     if (hasHandledDeepLink.current) return;
     if (!courses || courses.length === 0) return;
 
+    // Never override if user is already on lookup mode
+    if (viewMode === 'lookup') {
+      hasHandledDeepLink.current = true;
+      return;
+    }
+
     const params = new URLSearchParams(window.location.search);
     const slugOrId = params.get('course') || params.get('slug') || params.get('id') || params.get('c');
 
@@ -83,13 +89,18 @@ export const StudentHub = () => {
     }
   };
 
-  const handleLookup = (e) => {
-    if (e) e.preventDefault();
-    if (!phoneSearch || phoneSearch.length < 10) return;
-    const found = lookupStudentByPhone(phoneSearch);
+  const handleLookup = (e, explicitPhone) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const phoneToUse = typeof explicitPhone === 'string' ? explicitPhone : phoneSearch;
+    const clean = (phoneToUse || '').trim().replace(/\D/g, '').slice(-10);
+    if (!clean || clean.length < 10) {
+      if (!explicitPhone) showToast('Please enter a valid 10-digit mobile number', 'warning');
+      return;
+    }
+    const found = lookupStudentByPhone(clean);
     setAccountData(found);
     setHasSearched(true);
-    if (found && found.members.length > 0) {
+    if (found && found.members && found.members.length > 0) {
       setSelectedMember(found.members[0]);
     } else {
       setSelectedMember(null);
@@ -140,8 +151,8 @@ export const StudentHub = () => {
             onBack={handleBackToCatalog}
             onComplete={(newEnrollment) => {
               setPhoneSearch(newEnrollment.account_phone);
-              handleLookup();
               setViewMode('lookup');
+              handleLookup(null, newEnrollment.account_phone);
               showToast(`Registration confirmed! Admission No: ${newEnrollment.admission_number}`);
             }}
           />
