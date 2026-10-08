@@ -7,6 +7,7 @@ import { RemunerationAudits } from './RemunerationAudits';
 import { FinanceReconciliations } from './FinanceReconciliations';
 import { EventCheckInDesk } from './EventCheckInDesk';
 import { RPManager } from './RPManager';
+import { MarketingBroadcastHub } from './MarketingBroadcastHub';
 import {
   LayoutDashboard,
   BookOpen,
@@ -25,7 +26,8 @@ import {
   Cloud,
   HelpCircle,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  Megaphone
 } from 'lucide-react';
 
 export const AdminDashboard = () => {
@@ -116,6 +118,15 @@ export const AdminDashboard = () => {
         >
           <QrCode size={16} />
           <span>Gate Check-In</span>
+        </button>
+
+        <button
+          className={`tab-btn ${activeTab === 'marketing' ? 'active' : ''}`}
+          onClick={() => setActiveTab('marketing')}
+          style={{ background: activeTab === 'marketing' ? 'var(--cpet-primary)' : 'rgba(34, 197, 94, 0.08)', color: activeTab === 'marketing' ? 'white' : '#15803d' }}
+        >
+          <Megaphone size={16} />
+          <span>Marketing & Outreach</span>
         </button>
       </div>
 
@@ -341,6 +352,7 @@ export const AdminDashboard = () => {
       {activeTab === 'finance' && <FinanceReconciliations />}
       {activeTab === 'faculty' && <RPManager />}
       {activeTab === 'eventdesk' && <EventCheckInDesk />}
+      {activeTab === 'marketing' && <MarketingBroadcastHub />}
 
       {/* Database Credentials Fix Modal */}
       {showDbGuideModal && (
