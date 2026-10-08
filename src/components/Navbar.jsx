@@ -14,7 +14,27 @@ export const Navbar = () => {
     cloudError
   } = useApp();
 
-  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      return (p.get('tab') === 'marketing' || p.get('admin') || p.get('login')) && !currentUser;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  React.useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get('tab') === 'marketing' || p.get('admin')) {
+        if (currentUser?.role === 'admin') {
+          if (activeRole !== 'admin') setActiveRole('admin');
+        } else if (!currentUser) {
+          setShowLoginModal(true);
+        }
+      }
+    } catch (e) {}
+  }, [currentUser, activeRole, setActiveRole]);
 
   return (
     <header className="cpet-header">

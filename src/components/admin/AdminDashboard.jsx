@@ -43,7 +43,14 @@ export const AdminDashboard = () => {
     cloudError,
     syncAllLocalDataToCloud
   } = useApp();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      return p.get('tab') || p.get('admin_tab') || 'overview';
+    } catch (e) {
+      return 'overview';
+    }
+  });
   const [showDbGuideModal, setShowDbGuideModal] = useState(false);
   const [isWiping, setIsWiping] = useState(false);
 
@@ -55,7 +62,7 @@ export const AdminDashboard = () => {
   return (
     <div>
       {/* Sub Navigation Bar */}
-      <div className="cpet-tabs" style={{ marginBottom: '1.5rem' }}>
+      <div className="cpet-tabs" style={{ marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
         <button
           className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
           onClick={() => setActiveTab('overview')}
@@ -123,10 +130,21 @@ export const AdminDashboard = () => {
         <button
           className={`tab-btn ${activeTab === 'marketing' ? 'active' : ''}`}
           onClick={() => setActiveTab('marketing')}
-          style={{ background: activeTab === 'marketing' ? 'var(--cpet-primary)' : 'rgba(34, 197, 94, 0.08)', color: activeTab === 'marketing' ? 'white' : '#15803d' }}
+          style={{
+            background: activeTab === 'marketing' ? 'var(--cpet-primary)' : '#dcfce7',
+            color: activeTab === 'marketing' ? 'white' : '#15803d',
+            fontWeight: 700,
+            border: activeTab === 'marketing' ? 'none' : '1px solid #86efac',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
         >
           <Megaphone size={16} />
           <span>Marketing & Outreach</span>
+          <span style={{ fontSize: '0.65rem', background: '#22c55e', color: 'white', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 800 }}>
+            NEW
+          </span>
         </button>
       </div>
 
@@ -312,6 +330,23 @@ export const AdminDashboard = () => {
               </p>
               <button className="btn btn-primary btn-sm" onClick={() => setActiveTab('students')}>
                 Open Student Directory
+              </button>
+            </div>
+
+            <div className="cpet-card" style={{ border: '1.5px solid #86efac', background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#15803d', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Megaphone size={18} /> Marketing & WhatsApp Outreach
+                </h3>
+                <span style={{ fontSize: '0.65rem', background: '#22c55e', color: 'white', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 800 }}>
+                  NEW
+                </span>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem', lineHeight: 1.5 }}>
+                Filter registered candidates by age, gender, district, and past course categories. Export 1-click WhatsApp Broadcast Contacts (VCF/CSV), copy customized promotional pitches, or message candidates directly.
+              </p>
+              <button className="btn btn-primary btn-sm" onClick={() => setActiveTab('marketing')} style={{ background: '#16a34a', borderColor: '#16a34a' }}>
+                Open Marketing Suite
               </button>
             </div>
           </div>

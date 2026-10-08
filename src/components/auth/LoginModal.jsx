@@ -146,9 +146,26 @@ export const LoginModal = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
-              <button type="submit" className="btn btn-primary btn-block" style={{ marginTop: '1.5rem' }}>
+              <button type="submit" className="btn btn-primary btn-block" style={{ marginTop: '1.25rem' }}>
                 <ShieldCheck size={16} /> Sign In to Super Admin
               </button>
+
+              <div style={{ marginTop: '0.85rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '0.6rem 0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem' }}>
+                <div style={{ color: '#64748b' }}>
+                  <span>Official Admin: </span>
+                  <strong style={{ color: 'var(--cpet-primary)' }}>cpet@dhiu.in</strong> / <code>cpet@1986</code>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminUsername('cpet@dhiu.in');
+                    setAdminPassword('cpet@1986');
+                  }}
+                  style={{ background: '#e0e7ff', border: 'none', color: 'var(--cpet-primary)', fontWeight: 700, padding: '0.25rem 0.55rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                >
+                  Auto-Fill
+                </button>
+              </div>
             </form>
           ) : (
             <form onSubmit={handleRpSubmit}>
@@ -185,9 +202,26 @@ export const LoginModal = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
-              <button type="submit" className="btn btn-accent btn-block" style={{ marginTop: '1.5rem' }}>
+              <button type="submit" className="btn btn-accent btn-block" style={{ marginTop: '1.25rem' }}>
                 <GraduationCap size={16} /> Sign In to Teacher Portal
               </button>
+
+              <div style={{ marginTop: '0.85rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '0.6rem 0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem' }}>
+                <div style={{ color: '#64748b' }}>
+                  <span>Demo Faculty: </span>
+                  <strong style={{ color: 'var(--cpet-accent)' }}>9847012345</strong> / <code>cpet@rp1</code>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRpPhone('9847012345');
+                    setRpPassword('cpet@rp1');
+                  }}
+                  style={{ background: '#fef3c7', border: 'none', color: '#b45309', fontWeight: 700, padding: '0.25rem 0.55rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                >
+                  Auto-Fill
+                </button>
+              </div>
             </form>
           )}
         </div>
