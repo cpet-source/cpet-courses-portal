@@ -52,6 +52,9 @@ export const AppProvider = ({ children }) => {
     try {
       const params = new URLSearchParams(window.location.search);
       if (params.get('gate') || params.get('desk')) return 'volunteer_desk';
+      // If URL explicitly targets a course registration link (?course=... or ?slug=...),
+      // prioritize 'student' view so test links open the live student admission form!
+      if (params.get('course') || params.get('slug') || params.get('c')) return 'student';
     } catch (e) {}
     const user = getStored('cpet_current_user_prod', null);
     if (user?.role === 'admin') return 'admin';
