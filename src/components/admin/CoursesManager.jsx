@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download, Building, Upload, Image as ImageIcon, Users, Layers, Search, Filter, X, AlertCircle } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download, Building, Upload, Image as ImageIcon, Users, Layers, Search, Filter, X, AlertCircle, UserCheck } from 'lucide-react';
 
 export const CoursesManager = () => {
   const {
@@ -877,6 +877,22 @@ export const CoursesManager = () => {
                   <ExternalLink size={13} />
                   <span>Test Link</span>
                 </a>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ background: '#f0fdf4', color: '#166534', borderColor: '#bbf7d0', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  onClick={() => {
+                    const gateTarget = course.slug || course.course_code?.toLowerCase() || course.id;
+                    const url = `${window.location.origin}/?gate=${gateTarget}`;
+                    navigator.clipboard.writeText(url);
+                    showToast('Volunteer Gate Desk link copied! Share this with your student volunteer team.');
+                  }}
+                  title="Copy direct Gate Check-In Desk link for student volunteers (No admin password needed)"
+                >
+                  <UserCheck size={13} />
+                  <span>Gate Desk Link</span>
+                </button>
               </div>
 
               <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>

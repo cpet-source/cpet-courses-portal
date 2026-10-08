@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { ShieldCheck, GraduationCap, Lock, Phone, Mail, AlertCircle, X } from 'lucide-react';
 
 export const LoginModal = ({ isOpen, onClose }) => {
-  const { loginAdmin, loginRp, showToast } = useApp();
+  const { loginAdmin, loginRp, setActiveRole, showToast } = useApp();
   const [loginTab, setLoginTab] = useState('admin'); // 'admin' | 'rp'
 
   // Admin form
@@ -190,6 +190,21 @@ export const LoginModal = ({ isOpen, onClose }) => {
               </button>
             </form>
           )}
+        </div>
+
+        {/* Volunteer Gate Desk Quick Access */}
+        <div style={{ borderTop: '1px solid var(--cpet-border)', padding: '0.85rem 1.25rem', background: '#f8fafc', textAlign: 'center', borderRadius: '0 0 var(--radius-lg) var(--radius-lg)' }}>
+          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Assigned to event entrance duty? </span>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveRole('volunteer_desk');
+              onClose();
+            }}
+            style={{ background: 'none', border: 'none', color: '#16a34a', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Launch Volunteer Gate Desk
+          </button>
         </div>
       </div>
     </div>

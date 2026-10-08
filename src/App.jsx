@@ -4,6 +4,7 @@ import { Navbar } from './components/Navbar';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { RPDashboard } from './components/rp/RPDashboard';
 import { StudentHub } from './components/student/StudentHub';
+import { VolunteerGateDesk } from './components/volunteer/VolunteerGateDesk';
 import { CheckCircle, AlertCircle, Info, Heart } from 'lucide-react';
 
 const MainLayout = () => {
@@ -17,6 +18,7 @@ const MainLayout = () => {
         {activeRole === 'admin' && <AdminDashboard />}
         {activeRole === 'rp' && <RPDashboard />}
         {activeRole === 'student' && <StudentHub />}
+        {activeRole === 'volunteer_desk' && <VolunteerGateDesk />}
       </main>
 
       {/* Global Toast Notification */}

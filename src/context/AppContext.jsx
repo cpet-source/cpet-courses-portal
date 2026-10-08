@@ -47,12 +47,25 @@ export const AppProvider = ({ children }) => {
   // Authentication state
   const [currentUser, setCurrentUser] = useState(() => getStored('cpet_current_user_prod', null));
 
-  // Active view role: 'admin' | 'rp' | 'student'. Defaults to 'student' if not authenticated!
+  // Active view role: 'admin' | 'rp' | 'student' | 'volunteer_desk'. Defaults to 'student' if not authenticated!
   const [activeRole, setActiveRole] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('gate') || params.get('desk')) return 'volunteer_desk';
+    } catch (e) {}
     const user = getStored('cpet_current_user_prod', null);
     if (user?.role === 'admin') return 'admin';
     if (user?.role === 'rp') return 'rp';
     return 'student';
+  });
+
+  const [volunteerCourseTarget, setVolunteerCourseTarget] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('gate') || params.get('desk') || '';
+    } catch (e) {
+      return '';
+    }
   });
 
   // Currently logged-in RP
@@ -1063,6 +1076,48 @@ export const AppProvider = ({ children }) => {
     showToast('Attendance recorded.');
   };
 
+  const checkInStudentAtGate = (enrollmentId, { companionsCount = 0, remarks = '', collectFee = false, feeAmount = 0 } = {}) => {
+    setEnrollments(prev => prev.map(e => {
+      if (e.id === enrollmentId) {
+        const updated = {
+          ...e,
+          classes_attended: Math.max(e.classes_attended || 0, 1),
+          attended_sessions: Array.isArray(e.attended_sessions) && e.attended_sessions.length > 0 ? e.attended_sessions : [1],
+          completion_status: 'COMPLETED',
+          gate_companions_count: Number(companionsCount) || 0,
+          gate_remarks: remarks || e.gate_remarks || '',
+          gate_checked_in_at: new Date().toISOString(),
+          ...(collectFee ? {
+            fee_status: 'PAID_ON_SPOT',
+            amount_paid: Number(feeAmount) || e.amount_paid || 0
+          } : {})
+        };
+        syncToCloud('Enrollment', updated);
+        return updated;
+      }
+      return e;
+    }));
+    showToast('Gate check-in recorded successfully!');
+  };
+
+  const undoGateCheckIn = (enrollmentId) => {
+    setEnrollments(prev => prev.map(e => {
+      if (e.id === enrollmentId) {
+        const updated = {
+          ...e,
+          classes_attended: 0,
+          attended_sessions: [],
+          completion_status: 'IN_PROGRESS',
+          gate_checked_in_at: null
+        };
+        syncToCloud('Enrollment', updated);
+        return updated;
+      }
+      return e;
+    }));
+    showToast('Check-in status reverted.', 'info');
+  };
+
   const toggleStudentSessionAttendance = (enrollmentId, sessionNumber) => {
     setEnrollments(prev => prev.map(enr => {
       if (enr.id === enrollmentId) {
@@ -1162,9 +1217,13 @@ export const AppProvider = ({ children }) => {
         confirmRemittance,
         deleteRemittance,
         disbursePayout,
+        volunteerCourseTarget,
+        setVolunteerCourseTarget,
         updateStudentMarks,
         updateStudentFee,
         markStudentAttendance,
+        checkInStudentAtGate,
+        undoGateCheckIn,
         toggleStudentSessionAttendance,
         batchMarkSessionAttendance
       }}

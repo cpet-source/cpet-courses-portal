@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { LoginModal } from './auth/LoginModal';
-import { ShieldCheck, GraduationCap, Users, Lock, LogOut, Building2, Cloud, AlertCircle } from 'lucide-react';
+import { ShieldCheck, GraduationCap, Users, Lock, LogOut, Building2, Cloud, AlertCircle, UserCheck } from 'lucide-react';
 
 export const Navbar = () => {
   const {
@@ -32,8 +32,29 @@ export const Navbar = () => {
 
         {/* Navigation & Role Area */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {/* If Active as Volunteer Gate Desk */}
+          {activeRole === 'volunteer_desk' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span className="badge badge-success" style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                🟢 Gate Desk Mode
+              </span>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setActiveRole('student');
+                  if (window.history.replaceState) {
+                    window.history.replaceState({}, '', window.location.pathname);
+                  }
+                }}
+                style={{ fontSize: '0.8rem' }}
+              >
+                Exit to Public
+              </button>
+            </div>
+          )}
+
           {/* If Logged In as Super Admin */}
-          {currentUser && currentUser.role === 'admin' && (
+          {currentUser && currentUser.role === 'admin' && activeRole !== 'volunteer_desk' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {isCloudConnected ? (
                 <span className="badge badge-success hide-on-mobile" style={{ fontSize: '0.72rem' }}>
@@ -74,7 +95,7 @@ export const Navbar = () => {
           )}
 
           {/* If Logged In as Resource Person */}
-          {currentUser && currentUser.role === 'rp' && (
+          {currentUser && currentUser.role === 'rp' && activeRole !== 'volunteer_desk' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <div className="role-switcher">
                 <button
@@ -106,13 +127,23 @@ export const Navbar = () => {
           )}
 
           {/* If NOT Logged In (Public / Students) */}
-          {!currentUser && (
+          {!currentUser && activeRole !== 'volunteer_desk' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               {isCloudConnected && (
                 <span className="badge badge-success hide-on-mobile" style={{ fontSize: '0.72rem' }}>
                   <Cloud size={12} /> Cloud Connected
                 </span>
               )}
+
+              <button
+                className="btn btn-outline btn-sm hide-on-mobile"
+                onClick={() => setActiveRole('volunteer_desk')}
+                style={{ fontSize: '0.8rem', borderColor: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '4px' }}
+                title="Open Event Entrance Check-In Desk for Volunteers"
+              >
+                <UserCheck size={13} />
+                <span>Gate Desk</span>
+              </button>
 
               <button
                 className="btn btn-primary btn-sm"

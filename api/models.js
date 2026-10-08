@@ -83,7 +83,10 @@ const EnrollmentSchema = new mongoose.Schema({
   classes_attended: { type: Number, default: 0 },
   attended_sessions: [Number],
   marks: mongoose.Schema.Types.Mixed,
-  custom_responses: mongoose.Schema.Types.Mixed
+  custom_responses: mongoose.Schema.Types.Mixed,
+  gate_companions_count: { type: Number, default: 0 },
+  gate_remarks: String,
+  gate_checked_in_at: String
 }, { timestamps: true });
 
 const ClassLogSchema = new mongoose.Schema({
