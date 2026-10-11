@@ -337,12 +337,15 @@ _Darul Huda Islamic University, Chemmad_`;
 
     // If real credentials are provided, call Meta Cloud API Graph endpoint
     if (hasMetaCredentials) {
-      const endpoint = `https://graph.facebook.com/v21.0/${metaConfig.phoneNumberId.trim()}/messages`;
+      const isHelloWorld = (metaConfig.templateName || '').trim().toLowerCase() === 'hello_world';
       const payload = {
         messaging_product: 'whatsapp',
         to: `91${cleanPhone}`,
         type: 'template',
-        template: {
+        template: isHelloWorld ? {
+          name: 'hello_world',
+          language: { code: 'en_US' }
+        } : {
           name: metaConfig.templateName || 'cpet_course_admission',
           language: { code: metaConfig.templateLanguage || 'en' },
           components: [
@@ -369,7 +372,54 @@ _Darul Huda Islamic University, Chemmad_`;
         }
       };
 
-      const response = await fetch(endpoint, {
+      // 1. Try local Vite proxy (/meta-whatsapp-proxy) to avoid browser CORS blocks
+      try {
+        const proxyRes = await fetch(`/meta-whatsapp-proxy/v21.0/${metaConfig.phoneNumberId.trim()}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${metaConfig.accessToken.trim()}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        const proxyData = await proxyRes.json();
+        if (proxyRes.ok) {
+          return { success: true, messageId: proxyData?.messages?.[0]?.id || `wamid_${Date.now()}` };
+        } else if (proxyData?.error?.message) {
+          throw new Error(proxyData.error.message);
+        }
+      } catch (err) {
+        // If it's a Meta API error message from the response, throw it directly
+        if (err.message && !err.message.includes('fetch') && !err.message.includes('Failed')) {
+          throw err;
+        }
+      }
+
+      // 2. Try Vercel serverless proxy (/api/whatsapp)
+      try {
+        const vercelRes = await fetch('/api/whatsapp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phoneNumberId: metaConfig.phoneNumberId.trim(),
+            accessToken: metaConfig.accessToken.trim(),
+            payload
+          })
+        });
+        const vercelData = await vercelRes.json();
+        if (vercelRes.ok) {
+          return { success: true, messageId: vercelData?.messages?.[0]?.id || `wamid_${Date.now()}` };
+        } else if (vercelData?.error?.message) {
+          throw new Error(vercelData.error.message);
+        }
+      } catch (err) {
+        if (err.message && !err.message.includes('fetch') && !err.message.includes('Failed')) {
+          throw err;
+        }
+      }
+
+      // 3. Fallback direct call to Meta Graph API
+      const directRes = await fetch(`https://graph.facebook.com/v21.0/${metaConfig.phoneNumberId.trim()}/messages`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${metaConfig.accessToken.trim()}`,
@@ -377,12 +427,11 @@ _Darul Huda Islamic University, Chemmad_`;
         },
         body: JSON.stringify(payload)
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error?.message || 'Meta API delivery failed');
+      const directData = await directRes.json();
+      if (!directRes.ok) {
+        throw new Error(directData?.error?.message || 'Meta API delivery failed');
       }
-      return { success: true, messageId: data?.messages?.[0]?.id || `wamid_${Date.now()}` };
+      return { success: true, messageId: directData?.messages?.[0]?.id || `wamid_${Date.now()}` };
     }
 
     // Simulation / Pre-Configuration Mode
