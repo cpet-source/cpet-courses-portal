@@ -1,14 +1,29 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Search, Download, MessageCircle, Eye, CheckCircle, Clock, AlertCircle, Filter, UserCheck, Calendar, RefreshCw } from 'lucide-react';
+import { Search, Download, MessageCircle, Eye, CheckCircle, Clock, AlertCircle, Filter, UserCheck, Calendar, RefreshCw, Trash2 } from 'lucide-react';
 
 export const StudentsMasterDirectory = () => {
-  const { students, enrollments, courses, centres, updateStudentFee, showToast, fetchLatestFromCloud } = useApp();
+  const {
+    students,
+    enrollments,
+    courses,
+    centres,
+    updateStudentFee,
+    deleteStudentEnrollment,
+    deleteStudentCompletely,
+    showToast,
+    fetchLatestFromCloud
+  } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCourseFilter, setSelectedCourseFilter] = useState('ALL');
   const [selectedFeeFilter, setSelectedFeeFilter] = useState('ALL');
   const [selectedStudentFor360, setSelectedStudentFor360] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Student Deletion State
+  const [studentToDelete, setStudentToDelete] = useState(null);
+  const [deleteScope, setDeleteScope] = useState('ALL'); // 'ALL' | 'THIS_COURSE_ONLY'
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -272,6 +287,21 @@ export const StudentsMasterDirectory = () => {
                           <Eye size={14} />
                           <span className="hide-on-mobile">360° View</span>
                         </button>
+
+                        {/* Delete Student Record */}
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          style={{ color: '#dc2626', borderColor: '#fca5a5', background: '#fff5f5', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          onClick={() => {
+                            setStudentToDelete(enr);
+                            setDeleteScope('ALL');
+                          }}
+                          title="Permanently Delete Student & Erase Records"
+                        >
+                          <Trash2 size={13} />
+                          <span className="hide-on-mobile">Delete</span>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -385,11 +415,167 @@ export const StudentsMasterDirectory = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Danger Zone: Erase Student Records */}
+              <div style={{ marginTop: '1.25rem', padding: '0.85rem 1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div>
+                  <strong style={{ color: '#991b1b', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Trash2 size={14} /> Danger Zone: Erase Student
+                  </strong>
+                  <span style={{ fontSize: '0.78rem', color: '#b91c1c' }}>
+                    Permanently delete this student and erase all courses, fees, and marks.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{ background: '#dc2626', color: 'white', border: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  onClick={() => {
+                    const target = selectedStudentFor360;
+                    setSelectedStudentFor360(null);
+                    setStudentToDelete(target);
+                    setDeleteScope('ALL');
+                  }}
+                >
+                  <Trash2 size={13} /> Erase All Records
+                </button>
+              </div>
             </div>
 
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setSelectedStudentFor360(null)}>
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permanently Delete Student Confirmation Modal */}
+      {studentToDelete && (
+        <div className="modal-overlay" onClick={() => !isDeleting && setStudentToDelete(null)}>
+          <div className="modal-content" style={{ maxWidth: '540px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header" style={{ borderBottom: '1px solid #fee2e2', background: '#fff5f5' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
+                  <Trash2 size={18} />
+                </div>
+                <h3 style={{ margin: 0, color: '#991b1b', fontSize: '1.15rem' }}>Permanently Delete Student</h3>
+              </div>
+              {!isDeleting && (
+                <button className="modal-close-btn" onClick={() => setStudentToDelete(null)}>✕</button>
+              )}
+            </div>
+
+            <div className="modal-body" style={{ padding: '1.25rem' }}>
+              {/* Target Student Identity Card */}
+              <div style={{ background: '#f8fafc', border: '1px solid var(--cpet-border)', borderRadius: 'var(--radius-md)', padding: '0.85rem 1rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
+                  <div>
+                    <h4 style={{ margin: 0, color: 'var(--cpet-primary)', fontSize: '1.05rem', fontWeight: 800 }}>
+                      {studentToDelete.student_name}
+                    </h4>
+                    <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                      📱 Registered Mobile: <strong>+91 {studentToDelete.account_phone}</strong>
+                    </span>
+                  </div>
+                  <span className="badge badge-neutral" style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                    {studentToDelete.admission_number}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.78rem', color: '#475569', flexWrap: 'wrap', marginTop: '0.4rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.4rem' }}>
+                  <span>Course: <strong>{studentToDelete.course_title}</strong></span>
+                  <span>•</span>
+                  <span>Fee: <strong style={{ color: studentToDelete.fee_status === 'OFFICE_CONFIRMED' || studentToDelete.fee_status === 'FREE' ? '#16a34a' : '#dc2626' }}>{studentToDelete.fee_status.replace(/_/g, ' ')} (₹{studentToDelete.amount_paid || 0})</strong></span>
+                </div>
+              </div>
+
+              {/* Multi-Course Scope Selection */}
+              {(() => {
+                const totalUnderPhone = enrollments.filter(e => e.account_phone === studentToDelete.account_phone);
+                if (totalUnderPhone.length > 1) {
+                  return (
+                    <div style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 'var(--radius-md)', padding: '0.85rem', marginBottom: '1rem' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '0.5rem' }}>
+                        This phone number has {totalUnderPhone.length} course enrollments. Choose deletion scope:
+                      </span>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', marginBottom: '0.4rem', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="deleteScope"
+                          value="ALL"
+                          checked={deleteScope === 'ALL'}
+                          onChange={() => setDeleteScope('ALL')}
+                        />
+                        <span><strong>Erase all records for this student</strong> (All {totalUnderPhone.length} courses, fees & account profile)</span>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="deleteScope"
+                          value="THIS_COURSE_ONLY"
+                          checked={deleteScope === 'THIS_COURSE_ONLY'}
+                          onChange={() => setDeleteScope('THIS_COURSE_ONLY')}
+                        />
+                        <span><strong>Delete only this enrollment</strong> ({studentToDelete.course_title})</span>
+                      </label>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Warning List */}
+              <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 'var(--radius-md)', padding: '0.85rem 1rem', color: '#9f1239', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, marginBottom: '4px' }}>
+                  <AlertCircle size={15} />
+                  <span>Warning: This action is permanent and cannot be undone!</span>
+                </div>
+                <div style={{ marginTop: '4px' }}>
+                  Confirming deletion will completely erase:
+                  <br />• Course enrollment & Admission Number
+                  <br />• Fee records, receipts, and payment statuses
+                  <br />• Gate check-in status, attendance logs, and exam marks
+                  <br />• Student account from local storage and MongoDB cloud
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ borderTop: '1px solid var(--cpet-border)', padding: '0.85rem 1.25rem', display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={isDeleting}
+                onClick={() => setStudentToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                style={{ background: '#dc2626', color: 'white', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                disabled={isDeleting}
+                onClick={async () => {
+                  setIsDeleting(true);
+                  try {
+                    if (deleteScope === 'THIS_COURSE_ONLY') {
+                      deleteStudentEnrollment(studentToDelete.id);
+                    } else {
+                      deleteStudentCompletely(
+                        studentToDelete.account_phone,
+                        studentToDelete.student_profile_id,
+                        studentToDelete.student_name
+                      );
+                    }
+                    setStudentToDelete(null);
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+              >
+                <Trash2 size={15} />
+                <span>{isDeleting ? 'Erasing Records...' : 'Permanently Delete Student'}</span>
               </button>
             </div>
           </div>

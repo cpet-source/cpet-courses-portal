@@ -153,20 +153,38 @@ export const AppProvider = ({ children }) => {
   };
 
   // Helper to delete an entity from MongoDB
-  const deleteFromCloud = async (entityName, id) => {
+  const deleteFromCloud = async (entityName, id, extra = {}) => {
     try {
       const res = await fetch('/api/data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'DELETE_ENTITY',
-          payload: { entityName, id }
+          payload: { entityName, id, ...extra }
         })
       });
       const data = await res.json();
       return !!data?.success;
     } catch (e) {
       console.warn('Network delete error:', e);
+      return false;
+    }
+  };
+
+  const deleteStudentCascadeFromCloud = async (account_phone, student_profile_id, enrollment_id) => {
+    try {
+      const res = await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'DELETE_STUDENT_CASCADE',
+          payload: { account_phone, student_profile_id, enrollment_id }
+        })
+      });
+      const data = await res.json();
+      return !!data?.success;
+    } catch (e) {
+      console.warn('Network student cascade delete error:', e);
       return false;
     }
   };
@@ -855,6 +873,97 @@ export const AppProvider = ({ children }) => {
     return newEnrollment;
   };
 
+  // Delete a specific student enrollment and cascade-clean member profile if no other courses exist
+  const deleteStudentEnrollment = (enrollmentId) => {
+    const target = enrollments.find(e => e.id === enrollmentId);
+    if (!target) return;
+
+    // 1. Remove enrollment from state & cloud
+    const remainingForPhone = enrollments.filter(e => e.id !== enrollmentId && e.account_phone === target.account_phone);
+    setEnrollments(prev => prev.filter(e => e.id !== enrollmentId));
+    deleteFromCloud('Enrollment', enrollmentId);
+
+    // 2. Clean up student member profile if this student has no other courses anywhere
+    const remainingForProfile = remainingForPhone.filter(e =>
+      (target.student_profile_id && e.student_profile_id === target.student_profile_id) ||
+      (e.student_name && e.student_name.toLowerCase() === target.student_name.toLowerCase())
+    );
+
+    if (remainingForProfile.length === 0) {
+      setStudents(prev => {
+        const acc = prev.find(a => a.account_phone === target.account_phone);
+        if (!acc) return prev;
+        const newMembers = (acc.members || []).filter(m =>
+          (target.student_profile_id ? m.id !== target.student_profile_id : true) &&
+          m.full_name?.toLowerCase() !== target.student_name?.toLowerCase()
+        );
+
+        if (newMembers.length === 0) {
+          deleteFromCloud('StudentAccount', null, { account_phone: target.account_phone });
+          return prev.filter(a => a.account_phone !== target.account_phone);
+        } else {
+          const updatedAcc = { ...acc, members: newMembers };
+          syncToCloud('StudentAccount', updatedAcc);
+          return prev.map(a => a.account_phone === target.account_phone ? updatedAcc : a);
+        }
+      });
+    }
+
+    showToast(`Enrollment record for "${target.student_name}" (${target.course_title}) deleted.`);
+  };
+
+  // Permanently delete student and erase all their enrollments, fees, and profile records
+  const deleteStudentCompletely = (accountPhone, studentProfileId = null, studentName = null) => {
+    const cleanPhone = (accountPhone || '').trim().replace(/\D/g, '').slice(-10);
+
+    // 1. Delete all enrollments for this student
+    const enrollmentsToDelete = enrollments.filter(e => {
+      if (e.account_phone !== cleanPhone) return false;
+      if (studentProfileId && e.student_profile_id) {
+        return e.student_profile_id === studentProfileId;
+      }
+      if (studentName) {
+        return e.student_name?.toLowerCase() === studentName.toLowerCase();
+      }
+      return true;
+    });
+
+    const deleteIds = enrollmentsToDelete.map(e => e.id);
+    setEnrollments(prev => prev.filter(e => !deleteIds.includes(e.id)));
+
+    // 2. Remove member profile or entire student account
+    setStudents(prev => {
+      const acc = prev.find(a => a.account_phone === cleanPhone);
+      if (!acc) return prev;
+
+      let newMembers = acc.members || [];
+      if (studentProfileId || studentName) {
+        newMembers = newMembers.filter(m => {
+          if (studentProfileId && m.id === studentProfileId) return false;
+          if (studentName && m.full_name?.toLowerCase() === studentName.toLowerCase()) return false;
+          return true;
+        });
+      } else {
+        newMembers = [];
+      }
+
+      if (newMembers.length === 0) {
+        deleteFromCloud('StudentAccount', null, { account_phone: cleanPhone });
+        return prev.filter(a => a.account_phone !== cleanPhone);
+      } else {
+        const updatedAcc = { ...acc, members: newMembers };
+        syncToCloud('StudentAccount', updatedAcc);
+        return prev.map(a => a.account_phone === cleanPhone ? updatedAcc : a);
+      }
+    });
+
+    // 3. Cascade delete on Cloud
+    deleteStudentCascadeFromCloud(cleanPhone, studentProfileId, null);
+
+    const displayName = studentName || cleanPhone;
+    showToast(`Student "${displayName}" and all associated courses, fees, and records erased.`);
+  };
+
   // 5. Class Log Engine (RP & Remuneration)
   const addClassLog = (logData) => {
     const targetCourse = courses.find(c => c.id === logData.course_id);
@@ -1224,6 +1333,8 @@ export const AppProvider = ({ children }) => {
         setVolunteerCourseTarget,
         updateStudentMarks,
         updateStudentFee,
+        deleteStudentEnrollment,
+        deleteStudentCompletely,
         markStudentAttendance,
         checkInStudentAtGate,
         undoGateCheckIn,

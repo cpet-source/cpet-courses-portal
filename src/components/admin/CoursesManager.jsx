@@ -16,6 +16,7 @@ export const CoursesManager = () => {
     addCourseBatch,
     updateBatchStatus,
     assignRpToBatch,
+    deleteStudentEnrollment,
     showToast,
     setActiveRole
   } = useApp();
@@ -1093,6 +1094,7 @@ export const CoursesManager = () => {
                         <th>Attendance</th>
                         <th>Fee Status</th>
                         <th>Enrolled On</th>
+                        <th style={{ textAlign: 'right' }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1140,6 +1142,22 @@ export const CoursesManager = () => {
                             </td>
                             <td style={{ color: '#64748b', fontSize: '0.75rem' }}>
                               {enr.enrollment_date || 'N/A'}
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                style={{ color: '#dc2626', borderColor: '#fca5a5', background: '#fff5f5', padding: '0.2rem 0.5rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                title="Delete enrolled student and erase fee/admission records"
+                                onClick={() => {
+                                  if (window.confirm(`Delete "${enr.student_name}" (${enr.admission_number}) from ${currentModalCourse?.title}? This will permanently remove their enrollment, fee record, and admission details.`)) {
+                                    deleteStudentEnrollment(enr.id);
+                                  }
+                                }}
+                              >
+                                <Trash2 size={12} />
+                                <span>Delete</span>
+                              </button>
                             </td>
                           </tr>
                         );

@@ -190,10 +190,36 @@ export default async function handler(req, res) {
         if (entityName === 'Payout') Model = Payout;
 
         if (Model) {
+          if (entityName === 'Enrollment' && account_phone && !id) {
+            await Model.deleteMany({ account_phone });
+            return res.status(200).json({ success: true, message: `All enrollments for ${account_phone} deleted.` });
+          }
           const filter = id ? { id } : { account_phone };
           await Model.deleteOne(filter);
           return res.status(200).json({ success: true, message: `${entityName} deleted.` });
         }
+      }
+
+      if (type === 'DELETE_STUDENT_CASCADE') {
+        const { account_phone, student_profile_id, enrollment_id } = payload || {};
+        if (enrollment_id) {
+          await Enrollment.deleteOne({ id: enrollment_id });
+        } else if (account_phone) {
+          await Enrollment.deleteMany({ account_phone });
+        }
+
+        if (account_phone) {
+          const remainingEnrollments = await Enrollment.countDocuments({ account_phone });
+          if (remainingEnrollments === 0) {
+            await StudentAccount.deleteOne({ account_phone });
+          } else if (student_profile_id) {
+            await StudentAccount.updateOne(
+              { account_phone },
+              { $pull: { members: { id: student_profile_id } } }
+            );
+          }
+        }
+        return res.status(200).json({ success: true, message: 'Student records cascaded and erased.' });
       }
 
       return res.status(400).json({ error: 'Unknown operation type' });
