@@ -692,6 +692,46 @@ export const AppProvider = ({ children }) => {
     return newRp;
   };
 
+  const updateResourcePerson = (rpId, updatedFields) => {
+    const existing = resourcePersons.find(r => r.id === rpId);
+    if (!existing) return;
+    const updatedTarget = { ...existing, ...updatedFields };
+
+    setResourcePersons(prev => prev.map(r => r.id === rpId ? updatedTarget : r));
+    syncToCloud('ResourcePerson', updatedTarget);
+
+    // If this RP is currently logged in, sync their auth session credentials
+    if (currentUser?.role === 'rp' && currentUser?.id === rpId) {
+      const updatedUser = {
+        ...currentUser,
+        phone: updatedTarget.phone,
+        name: updatedTarget.full_name
+      };
+      setCurrentUser(updatedUser);
+      localStorage.setItem('cpet_current_user_prod', JSON.stringify(updatedUser));
+    }
+
+    showToast(`Credentials updated for ${updatedTarget.full_name}!`);
+  };
+
+  const deleteResourcePerson = (rpId) => {
+    const target = resourcePersons.find(r => r.id === rpId);
+    setResourcePersons(prev => prev.filter(r => r.id !== rpId));
+    deleteFromCloud('ResourcePerson', rpId);
+
+    // Unlink from any study centres where this RP was assigned
+    setCentres(prev => prev.map(c => {
+      if (c.assigned_rp_id === rpId) {
+        const updatedCentre = { ...c, assigned_rp_id: null };
+        syncToCloud('Centre', updatedCentre);
+        return updatedCentre;
+      }
+      return c;
+    }));
+
+    showToast(`Resource Person "${target?.full_name || 'Teacher'}" removed.`);
+  };
+
   // 4. Student Account & Enrollment Engine (Universal Phone)
   const lookupStudentByPhone = (rawPhone) => {
     const cleanPhone = (rawPhone || '').trim().replace(/\D/g, '').slice(-10);
@@ -1319,6 +1359,8 @@ export const AppProvider = ({ children }) => {
         updateCentreStatus,
         assignRpToCentre,
         addResourcePerson,
+        updateResourcePerson,
+        deleteResourcePerson,
         lookupStudentByPhone,
         registerOrEnrollStudent,
         addClassLog,

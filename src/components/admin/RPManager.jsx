@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { GraduationCap, UserPlus, Key, Edit2, CheckCircle, Phone, Mail, Building, MapPin, Download } from 'lucide-react';
+import { GraduationCap, UserPlus, Key, Edit2, CheckCircle, Phone, Mail, Building, MapPin, Download, Trash2 } from 'lucide-react';
 
 export const RPManager = () => {
-  const { resourcePersons, addResourcePerson, centres, classLogs, showToast } = useApp();
+  const { resourcePersons, addResourcePerson, updateResourcePerson, deleteResourcePerson, centres, classLogs, showToast } = useApp();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingRp, setEditingRp] = useState(null);
 
@@ -46,6 +46,17 @@ export const RPManager = () => {
     setShowAddModal(true);
   };
 
+  const handleDeleteRp = (rp) => {
+    const assigned = (centres || []).filter(c => c.assigned_rp_id === rp.id);
+    const assignedWarning = assigned.length > 0 
+      ? `\n\nWarning: This RP is currently assigned to ${assigned.length} centre(s): ${assigned.map(c => c.place).join(', ')}. They will be unassigned automatically.`
+      : '';
+    
+    if (window.confirm(`Are you sure you want to delete Resource Person "${rp.full_name}"?${assignedWarning}`)) {
+      deleteResourcePerson(rp.id);
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.full_name || !formData.phone || !formData.password) {
@@ -54,14 +65,7 @@ export const RPManager = () => {
     }
 
     if (editingRp) {
-      // In AppContext, update
-      editingRp.full_name = formData.full_name;
-      editingRp.phone = formData.phone;
-      editingRp.password = formData.password;
-      editingRp.email = formData.email;
-      editingRp.qualification = formData.qualification;
-      editingRp.bank_account_details = formData.bank_account_details;
-      showToast(`Credentials updated for ${formData.full_name}!`);
+      updateResourcePerson(editingRp.id, formData);
     } else {
       addResourcePerson(formData);
     }
@@ -206,8 +210,18 @@ export const RPManager = () => {
               </div>
 
               {/* Actions Footer */}
-              <div style={{ borderTop: '1px solid var(--cpet-border)', paddingTop: '0.75rem', marginTop: '0.75rem', textAlign: 'right' }}>
+              <div style={{ borderTop: '1px solid var(--cpet-border)', paddingTop: '0.75rem', marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ color: '#ef4444', borderColor: '#fca5a5' }}
+                  onClick={() => handleDeleteRp(rp)}
+                  title={`Delete ${rp.full_name}`}
+                >
+                  <Trash2 size={13} /> Delete
+                </button>
+                <button
+                  type="button"
                   className="btn btn-secondary btn-sm"
                   onClick={() => handleOpenEdit(rp)}
                 >
