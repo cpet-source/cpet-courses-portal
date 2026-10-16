@@ -26,6 +26,72 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Sanitize and handle any base64 images in template header parameters
+    if (payload?.template?.components && Array.isArray(payload.template.components)) {
+      const sanitizedComponents = [];
+
+      for (const comp of payload.template.components) {
+        if (comp.type === 'header' && Array.isArray(comp.parameters)) {
+          let keepHeader = true;
+          for (let p = 0; p < comp.parameters.length; p++) {
+            const param = comp.parameters[p];
+            if (param.type === 'image' && param.image) {
+              const rawData = param.image.base64 || (param.image.link && param.image.link.startsWith('data:') ? param.image.link : null);
+
+              if (rawData) {
+                // Try uploading to Meta media endpoint
+                try {
+                  const match = rawData.match(/^data:([^;]+);base64,(.+)$/);
+                  if (match) {
+                    const mimeType = match[1];
+                    const buffer = Buffer.from(match[2], 'base64');
+                    const blob = new Blob([buffer], { type: mimeType });
+
+                    const formData = new FormData();
+                    formData.append('messaging_product', 'whatsapp');
+                    formData.append('type', mimeType);
+                    formData.append('file', blob, 'poster.jpg');
+
+                    const uploadRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/media`, {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${accessToken.trim()}`
+                      },
+                      body: formData
+                    });
+
+                    const uploadData = await uploadRes.json();
+                    if (uploadRes.ok && uploadData?.id) {
+                      param.image = { id: uploadData.id };
+                    } else {
+                      console.warn('Meta media upload fallback:', uploadData);
+                      keepHeader = false;
+                    }
+                  } else {
+                    keepHeader = false;
+                  }
+                } catch (uploadErr) {
+                  console.warn('Failed to upload base64 to Meta media:', uploadErr);
+                  keepHeader = false;
+                }
+              } else if (param.image.link && !param.image.link.startsWith('http://') && !param.image.link.startsWith('https://')) {
+                // Invalid URI scheme
+                keepHeader = false;
+              }
+            }
+          }
+
+          if (keepHeader) {
+            sanitizedComponents.push(comp);
+          }
+        } else {
+          sanitizedComponents.push(comp);
+        }
+      }
+
+      payload.template.components = sanitizedComponents;
+    }
+
     const metaUrl = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
     const response = await fetch(metaUrl, {
       method: 'POST',

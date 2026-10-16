@@ -89,6 +89,7 @@ export const MarketingBroadcastHub = () => {
 
   // 5. Test Message Dispatcher State
   const [testPhoneNumber, setTestPhoneNumber] = useState('');
+  const [testTemplateChoice, setTestTemplateChoice] = useState('hello_world');
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
@@ -332,12 +333,17 @@ _Darul Huda Islamic University, Chemmad_`;
   );
 
   // Meta Cloud API Dispatch Engine (Supports live API and realistic Simulation Mode)
-  const executeMetaApiCall = async (phone10Digit, studentName) => {
+  const executeMetaApiCall = async (phone10Digit, studentName, templateOverride = null) => {
     const cleanPhone = phone10Digit.replace(/\D/g, '').slice(-10);
 
     // If real credentials are provided, call Meta Cloud API Graph endpoint
     if (hasMetaCredentials) {
-      const isHelloWorld = (metaConfig.templateName || '').trim().toLowerCase() === 'hello_world';
+      const activeTemplate = templateOverride || metaConfig.templateName || 'cpet_course_admission';
+      const isHelloWorld = activeTemplate.trim().toLowerCase() === 'hello_world';
+      const hasHttpLink = typeof activeCourse?.poster_url === 'string' && 
+        (activeCourse.poster_url.startsWith('http://') || activeCourse.poster_url.startsWith('https://'));
+      const isBase64 = typeof activeCourse?.poster_url === 'string' && activeCourse.poster_url.startsWith('data:');
+
       const payload = {
         messaging_product: 'whatsapp',
         to: `91${cleanPhone}`,
@@ -346,13 +352,16 @@ _Darul Huda Islamic University, Chemmad_`;
           name: 'hello_world',
           language: { code: 'en_US' }
         } : {
-          name: metaConfig.templateName || 'cpet_course_admission',
+          name: activeTemplate,
           language: { code: metaConfig.templateLanguage || 'en' },
           components: [
-            ...(activeCourse?.poster_url ? [{
+            ...(hasHttpLink ? [{
               type: 'header',
               parameters: [{ type: 'image', image: { link: activeCourse.poster_url } }]
-            }] : []),
+            }] : (isBase64 ? [{
+              type: 'header',
+              parameters: [{ type: 'image', image: { base64: activeCourse.poster_url } }]
+            }] : [])),
             {
               type: 'body',
               parameters: [
@@ -456,12 +465,12 @@ _Darul Huda Islamic University, Chemmad_`;
     setTestResult(null);
 
     try {
-      const res = await executeMetaApiCall(cleanPhone, 'CPET Administrator');
+      const res = await executeMetaApiCall(cleanPhone, 'CPET Administrator', testTemplateChoice);
       setTestResult({
         success: true,
         message: res.simulated
           ? `[Simulation] Message payload verified for +91 ${cleanPhone}. Message ID: ${res.messageId}`
-          : `Live WhatsApp template successfully dispatched to +91 ${cleanPhone}! Check your phone.`,
+          : `Live WhatsApp template "${testTemplateChoice}" successfully dispatched to +91 ${cleanPhone}! Check your phone.`,
         isSimulated: res.simulated,
         timestamp: new Date().toLocaleTimeString()
       });
@@ -1316,6 +1325,48 @@ _Darul Huda Islamic University, Chemmad_`;
               </p>
 
               <form onSubmit={handleSendTestMessage}>
+                <div className="form-group" style={{ marginBottom: '0.85rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600 }}>Choose Template to Test:</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setTestTemplateChoice('hello_world')}
+                      style={{
+                        padding: '0.5rem',
+                        fontSize: '0.78rem',
+                        borderRadius: 'var(--radius-sm)',
+                        border: testTemplateChoice === 'hello_world' ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                        background: testTemplateChoice === 'hello_world' ? '#eff6ff' : '#ffffff',
+                        fontWeight: testTemplateChoice === 'hello_world' ? 700 : 500,
+                        color: testTemplateChoice === 'hello_world' ? '#1e40af' : '#475569',
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>✓ hello_world</div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Meta Sandbox (Instant test)</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTestTemplateChoice(metaConfig.templateName || 'cpet_course_admission')}
+                      style={{
+                        padding: '0.5rem',
+                        fontSize: '0.78rem',
+                        borderRadius: 'var(--radius-sm)',
+                        border: testTemplateChoice !== 'hello_world' ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                        background: testTemplateChoice !== 'hello_world' ? '#eff6ff' : '#ffffff',
+                        fontWeight: testTemplateChoice !== 'hello_world' ? 700 : 500,
+                        color: testTemplateChoice !== 'hello_world' ? '#1e40af' : '#475569',
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>{metaConfig.templateName || 'cpet_course_admission'}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Course Admission Template</div>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="form-group">
                   <label className="form-label">Your 10-Digit Mobile Number:</label>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
