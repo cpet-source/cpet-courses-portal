@@ -284,7 +284,7 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
         <form onSubmit={handlePhoneLookup}>
           <div style={{ background: '#f8fafc', padding: '1rem 1.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--cpet-border)', marginBottom: '1.25rem' }}>
             <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--cpet-primary)', margin: '0 0 0.5rem' }}>
-              Step 1: Enter Your Mobile Number
+              Step 1: Register with your Mobile Number
             </h3>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
