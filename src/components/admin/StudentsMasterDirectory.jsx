@@ -63,21 +63,12 @@ export const StudentsMasterDirectory = () => {
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     if (!editingStudent) return;
-    if (!editFormData.student_name.trim()) {
-      showToast('Please enter student full name', 'warning');
-      return;
-    }
-    if (!editFormData.gender) {
-      showToast('Please select Gender (Male or Female)', 'warning');
-      return;
-    }
-    if (!editFormData.date_of_birth) {
-      showToast('Please enter Date of Birth', 'warning');
-      return;
-    }
-    const cleanPhone = editFormData.phone.trim().replace(/\D/g, '').slice(-10);
-    if (!cleanPhone || cleanPhone.length !== 10) {
-      showToast('Please enter a valid 10-digit mobile number', 'warning');
+
+    const finalName = editFormData.student_name?.trim() || editingStudent.student_name || 'Student';
+    const cleanPhone = editFormData.phone ? editFormData.phone.trim().replace(/\D/g, '').slice(-10) : (editingStudent.account_phone || '').trim().replace(/\D/g, '').slice(-10);
+
+    if (cleanPhone && cleanPhone.length !== 10) {
+      showToast('If updating mobile number, please provide a valid 10-digit number', 'warning');
       return;
     }
 
@@ -87,12 +78,12 @@ export const StudentsMasterDirectory = () => {
         enrollmentId: editingStudent.id,
         account_phone: editingStudent.account_phone,
         student_profile_id: editFormData.student_profile_id,
-        full_name: editFormData.student_name.trim(),
-        gender: editFormData.gender,
-        date_of_birth: editFormData.date_of_birth,
-        place: editFormData.place.trim(),
+        full_name: finalName,
+        gender: editFormData.gender || '',
+        date_of_birth: editFormData.date_of_birth || '',
+        place: (editFormData.place || '').trim(),
         district: editFormData.district,
-        new_phone: cleanPhone
+        new_phone: cleanPhone || editingStudent.account_phone
       });
       setEditingStudent(null);
     } catch (err) {
@@ -102,6 +93,8 @@ export const StudentsMasterDirectory = () => {
       setIsSavingEdit(false);
     }
   };
+
+
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -775,35 +768,34 @@ export const StudentsMasterDirectory = () => {
 
               <div className="modal-body" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', fontSize: '0.8rem', color: '#166534' }}>
-                  💡 <strong>Quick Fix:</strong> Correct the student's gender (Male/Female) and enter Date of Birth. All course records and cloud database will update automatically.
+                  💡 <strong>Admin Edit:</strong> None of these fields are mandatory when editing. You can correct the student's gender with 1 click without needing Date of Birth.
                 </div>
 
                 {/* Full Name */}
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
-                    Student Full Name <span style={{ color: '#dc2626' }}>*</span>
+                    Student Full Name
                   </label>
                   <input
                     type="text"
                     className="form-control"
-                    required
                     value={editFormData.student_name}
                     onChange={e => setEditFormData({ ...editFormData, student_name: e.target.value })}
-                    placeholder="Enter student's official name"
+                    placeholder="Enter student's name"
                   />
                 </div>
 
-                {/* Gender - Quick Toggle Pills + Select */}
+                {/* Gender - Quick Toggle Pills */}
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
-                    Gender <span style={{ color: '#dc2626' }}>*</span>
+                    Gender {editFormData.gender && <span style={{ fontWeight: 400, color: 'var(--cpet-text-muted)', fontSize: '0.8rem' }}>({editFormData.gender === 'FEMALE' ? 'Female selected' : 'Male selected'})</span>}
                   </label>
                   
                   {/* Quick 1-click Toggle buttons */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.25rem' }}>
                     <button
                       type="button"
-                      onClick={() => setEditFormData({ ...editFormData, gender: 'FEMALE' })}
+                      onClick={() => setEditFormData({ ...editFormData, gender: editFormData.gender === 'FEMALE' ? '' : 'FEMALE' })}
                       style={{
                         padding: '0.75rem',
                         borderRadius: 'var(--radius-md)',
@@ -826,7 +818,7 @@ export const StudentsMasterDirectory = () => {
 
                     <button
                       type="button"
-                      onClick={() => setEditFormData({ ...editFormData, gender: 'MALE' })}
+                      onClick={() => setEditFormData({ ...editFormData, gender: editFormData.gender === 'MALE' ? '' : 'MALE' })}
                       style={{
                         padding: '0.75rem',
                         borderRadius: 'var(--radius-md)',
@@ -847,24 +839,17 @@ export const StudentsMasterDirectory = () => {
                       {editFormData.gender === 'MALE' && <CheckCircle size={15} color="#2563eb" />}
                     </button>
                   </div>
-
-                  {!editFormData.gender && (
-                    <span style={{ fontSize: '0.75rem', color: '#dc2626' }}>
-                      Please select either Female or Male
-                    </span>
-                  )}
                 </div>
 
                 {/* Date of Birth & Mobile Phone */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
-                      Date of Birth <span style={{ color: '#dc2626' }}>*</span>
+                      Date of Birth <span style={{ fontWeight: 400, color: 'var(--cpet-text-muted)', fontSize: '0.75rem' }}>(Optional)</span>
                     </label>
                     <input
                       type="date"
                       className="form-control"
-                      required
                       value={editFormData.date_of_birth}
                       onChange={e => setEditFormData({ ...editFormData, date_of_birth: e.target.value })}
                     />
@@ -872,12 +857,11 @@ export const StudentsMasterDirectory = () => {
 
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
-                      Mobile Number <span style={{ color: '#dc2626' }}>*</span>
+                      Mobile Number
                     </label>
                     <input
                       type="tel"
                       className="form-control"
-                      required
                       maxLength={10}
                       value={editFormData.phone}
                       onChange={e => setEditFormData({ ...editFormData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
