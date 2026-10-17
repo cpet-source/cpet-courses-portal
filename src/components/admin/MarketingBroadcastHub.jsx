@@ -338,52 +338,61 @@ _Darul Huda Islamic University, Chemmad_`;
 
     // If real credentials are provided, call Meta Cloud API Graph endpoint
     if (hasMetaCredentials) {
-      const activeTemplate = templateOverride || metaConfig.templateName || 'cpet_course_admission';
-      const isHelloWorld = activeTemplate.trim().toLowerCase() === 'hello_world';
+      const activeTemplate = (templateOverride || metaConfig.templateName || 'hello_world').trim();
+      const isHelloWorld = activeTemplate.toLowerCase() === 'hello_world';
       const hasHttpLink = typeof activeCourse?.poster_url === 'string' && 
         (activeCourse.poster_url.startsWith('http://') || activeCourse.poster_url.startsWith('https://'));
       const isBase64 = typeof activeCourse?.poster_url === 'string' && activeCourse.poster_url.startsWith('data:');
 
-      const payload = {
-        messaging_product: 'whatsapp',
-        to: `91${cleanPhone}`,
-        type: 'template',
-        template: isHelloWorld ? {
-          name: 'hello_world',
-          language: { code: 'en_US' }
-        } : {
-          name: activeTemplate,
-          language: { code: metaConfig.templateLanguage || 'en' },
-          components: [
-            ...(hasHttpLink ? [{
-              type: 'header',
-              parameters: [{ type: 'image', image: { link: activeCourse.poster_url } }]
-            }] : (isBase64 ? [{
-              type: 'header',
-              parameters: [{ type: 'image', image: { base64: activeCourse.poster_url } }]
-            }] : [])),
-            {
-              type: 'body',
-              parameters: [
-                { type: 'text', text: studentName || 'Candidate' },
-                { type: 'text', text: activeCourse?.title || 'Program' },
-                { type: 'text', text: activeCourse?.start_date || 'Upcoming' },
-                { type: 'text', text: activeCourse?.standard_fee > 0 ? `₹${activeCourse.standard_fee}` : 'FREE' }
-              ]
+      // Helper to dispatch payload through available proxy pipelines
+      const dispatchPayload = async (payload) => {
+        // 1. Try local Vite proxy (/meta-whatsapp-proxy)
+        try {
+          const proxyRes = await fetch(`/meta-whatsapp-proxy/v21.0/${metaConfig.phoneNumberId.trim()}/messages`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${metaConfig.accessToken.trim()}`,
+              'Content-Type': 'application/json'
             },
-            {
-              type: 'button',
-              sub_type: 'url',
-              index: '0',
-              parameters: [{ type: 'text', text: activeCourse?.slug || activeCourse?.id || '' }]
-            }
-          ]
+            body: JSON.stringify(payload)
+          });
+          const proxyData = await proxyRes.json();
+          if (proxyRes.ok) {
+            return { success: true, messageId: proxyData?.messages?.[0]?.id || `wamid_${Date.now()}` };
+          } else if (proxyData?.error?.message) {
+            throw new Error(proxyData.error.message);
+          }
+        } catch (err) {
+          if (err.message && !err.message.includes('fetch') && !err.message.includes('Failed')) {
+            throw err;
+          }
         }
-      };
 
-      // 1. Try local Vite proxy (/meta-whatsapp-proxy) to avoid browser CORS blocks
-      try {
-        const proxyRes = await fetch(`/meta-whatsapp-proxy/v21.0/${metaConfig.phoneNumberId.trim()}/messages`, {
+        // 2. Try Vercel serverless proxy (/api/whatsapp)
+        try {
+          const vercelRes = await fetch('/api/whatsapp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phoneNumberId: metaConfig.phoneNumberId.trim(),
+              accessToken: metaConfig.accessToken.trim(),
+              payload
+            })
+          });
+          const vercelData = await vercelRes.json();
+          if (vercelRes.ok) {
+            return { success: true, messageId: vercelData?.messages?.[0]?.id || `wamid_${Date.now()}` };
+          } else if (vercelData?.error?.message) {
+            throw new Error(vercelData.error.message);
+          }
+        } catch (err) {
+          if (err.message && !err.message.includes('fetch') && !err.message.includes('Failed')) {
+            throw err;
+          }
+        }
+
+        // 3. Fallback direct call to Meta Graph API
+        const directRes = await fetch(`https://graph.facebook.com/v21.0/${metaConfig.phoneNumberId.trim()}/messages`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${metaConfig.accessToken.trim()}`,
@@ -391,56 +400,81 @@ _Darul Huda Islamic University, Chemmad_`;
           },
           body: JSON.stringify(payload)
         });
-        const proxyData = await proxyRes.json();
-        if (proxyRes.ok) {
-          return { success: true, messageId: proxyData?.messages?.[0]?.id || `wamid_${Date.now()}` };
-        } else if (proxyData?.error?.message) {
-          throw new Error(proxyData.error.message);
+        const directData = await directRes.json();
+        if (!directRes.ok) {
+          throw new Error(directData?.error?.message || 'Meta API delivery failed');
         }
-      } catch (err) {
-        // If it's a Meta API error message from the response, throw it directly
-        if (err.message && !err.message.includes('fetch') && !err.message.includes('Failed')) {
-          throw err;
+        return { success: true, messageId: directData?.messages?.[0]?.id || `wamid_${Date.now()}` };
+      };
+
+      // Candidate language codes to test (handles regional en_US vs en differences)
+      const primaryLang = isHelloWorld ? 'en_US' : (metaConfig.templateLanguage || 'en');
+      const candidateLangs = [primaryLang];
+      if (primaryLang === 'en_US') candidateLangs.push('en');
+      else if (primaryLang === 'en') candidateLangs.push('en_US');
+
+      let lastError = null;
+
+      for (const langCode of candidateLangs) {
+        const payload = {
+          messaging_product: 'whatsapp',
+          to: `91${cleanPhone}`,
+          type: 'template',
+          template: isHelloWorld ? {
+            name: 'hello_world',
+            language: { code: langCode }
+          } : {
+            name: activeTemplate,
+            language: { code: langCode },
+            components: [
+              ...(hasHttpLink ? [{
+                type: 'header',
+                parameters: [{ type: 'image', image: { link: activeCourse.poster_url } }]
+              }] : (isBase64 ? [{
+                type: 'header',
+                parameters: [{ type: 'image', image: { base64: activeCourse.poster_url } }]
+              }] : [])),
+              {
+                type: 'body',
+                parameters: [
+                  { type: 'text', text: studentName || 'Candidate' },
+                  { type: 'text', text: activeCourse?.title || 'Program' },
+                  { type: 'text', text: activeCourse?.start_date || 'Upcoming' },
+                  { type: 'text', text: activeCourse?.standard_fee > 0 ? `₹${activeCourse.standard_fee}` : 'FREE' }
+                ]
+              },
+              {
+                type: 'button',
+                sub_type: 'url',
+                index: '0',
+                parameters: [{ type: 'text', text: activeCourse?.slug || activeCourse?.id || '' }]
+              }
+            ]
+          }
+        };
+
+        try {
+          return await dispatchPayload(payload);
+        } catch (err) {
+          lastError = err;
+          // Only retry with alternate language code if it was a translation/language error
+          if (!err.message || (!err.message.includes('132001') && !err.message.includes('translation'))) {
+            throw err;
+          }
         }
       }
 
-      // 2. Try Vercel serverless proxy (/api/whatsapp)
-      try {
-        const vercelRes = await fetch('/api/whatsapp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phoneNumberId: metaConfig.phoneNumberId.trim(),
-            accessToken: metaConfig.accessToken.trim(),
-            payload
-          })
-        });
-        const vercelData = await vercelRes.json();
-        if (vercelRes.ok) {
-          return { success: true, messageId: vercelData?.messages?.[0]?.id || `wamid_${Date.now()}` };
-        } else if (vercelData?.error?.message) {
-          throw new Error(vercelData.error.message);
+      if (lastError) {
+        if (lastError.message && (lastError.message.includes('132001') || lastError.message.includes('translation'))) {
+          throw new Error(
+            `Template "${activeTemplate}" was not found in your Meta WhatsApp Account. ` +
+            (isHelloWorld 
+              ? 'Please check the API Setup screen in Meta Developers to verify your test template.' 
+              : `Have you created and approved "${activeTemplate}" in Meta WhatsApp Manager? (Step 6)`)
+          );
         }
-      } catch (err) {
-        if (err.message && !err.message.includes('fetch') && !err.message.includes('Failed')) {
-          throw err;
-        }
+        throw lastError;
       }
-
-      // 3. Fallback direct call to Meta Graph API
-      const directRes = await fetch(`https://graph.facebook.com/v21.0/${metaConfig.phoneNumberId.trim()}/messages`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${metaConfig.accessToken.trim()}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-      const directData = await directRes.json();
-      if (!directRes.ok) {
-        throw new Error(directData?.error?.message || 'Meta API delivery failed');
-      }
-      return { success: true, messageId: directData?.messages?.[0]?.id || `wamid_${Date.now()}` };
     }
 
     // Simulation / Pre-Configuration Mode

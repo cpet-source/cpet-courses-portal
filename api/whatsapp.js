@@ -93,7 +93,7 @@ export default async function handler(req, res) {
     }
 
     const metaUrl = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
-    const response = await fetch(metaUrl, {
+    let response = await fetch(metaUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken.trim()}`,
@@ -102,7 +102,30 @@ export default async function handler(req, res) {
       body: JSON.stringify(payload)
     });
 
-    const data = await response.json();
+    let data = await response.json();
+
+    // Auto-retry on Meta Error #132001 (Template translation mismatch between en_US and en)
+    if (!response.ok && data?.error?.code === 132001 && payload?.template?.language?.code) {
+      const currentCode = payload.template.language.code;
+      const altCode = currentCode === 'en_US' ? 'en' : (currentCode === 'en' ? 'en_US' : null);
+
+      if (altCode) {
+        payload.template.language.code = altCode;
+        const retryRes = await fetch(metaUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken.trim()}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        const retryData = await retryRes.json();
+        if (retryRes.ok) {
+          return res.status(200).json(retryData);
+        }
+      }
+    }
+
     if (!response.ok) {
       return res.status(response.status).json(data);
     }
