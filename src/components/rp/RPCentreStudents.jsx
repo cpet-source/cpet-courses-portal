@@ -140,7 +140,7 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
   const [selectedMemberId, setSelectedMemberId] = useState(null);
   const [newMemberForm, setNewMemberForm] = useState({
     full_name: '',
-    gender: 'MALE',
+    gender: '', // No default - required
     date_of_birth: '',
     relationship: 'Self',
     place: ''
@@ -161,7 +161,7 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
     setSelectedMemberId(null);
     setNewMemberForm({
       full_name: '',
-      gender: 'MALE',
+      gender: '', // No default
       date_of_birth: '',
       relationship: 'Self',
       place: selectedCentre?.place || ''
@@ -220,6 +220,20 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
     if (isMahallu && !modalCentreId) {
       showToast('Please select a study centre for this course', 'danger');
       return;
+    }
+    if (!selectedMemberId) {
+      if (!newMemberForm.full_name?.trim()) {
+        showToast('Please enter candidate name', 'danger');
+        return;
+      }
+      if (!newMemberForm.gender) {
+        showToast('Please select student gender', 'danger');
+        return;
+      }
+      if (!newMemberForm.date_of_birth) {
+        showToast('Date of Birth is compulsory. Please select student date of birth.', 'danger');
+        return;
+      }
     }
 
     registerOrEnrollStudent({
@@ -1019,21 +1033,24 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                         <div className="form-group">
-                          <label className="form-label">Gender</label>
+                          <label className="form-label">Gender <span className="required">*</span></label>
                           <select
                             className="form-select"
+                            required
                             value={newMemberForm.gender}
                             onChange={e => setNewMemberForm({ ...newMemberForm, gender: e.target.value })}
                           >
+                            <option value="">-- Select Gender * --</option>
                             <option value="MALE">Male</option>
                             <option value="FEMALE">Female</option>
                           </select>
                         </div>
                         <div className="form-group">
-                          <label className="form-label">Date of Birth</label>
+                          <label className="form-label">Date of Birth <span className="required">*</span></label>
                           <input
                             type="date"
                             className="form-input"
+                            required
                             value={newMemberForm.date_of_birth}
                             onChange={e => setNewMemberForm({ ...newMemberForm, date_of_birth: e.target.value })}
                           />

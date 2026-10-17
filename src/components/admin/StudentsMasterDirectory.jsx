@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Search, Download, MessageCircle, Eye, CheckCircle, Clock, AlertCircle, Filter, UserCheck, Calendar, RefreshCw, Trash2 } from 'lucide-react';
+import { Search, Download, MessageCircle, Eye, CheckCircle, Clock, AlertCircle, Filter, UserCheck, Calendar, RefreshCw, Trash2, Edit2 } from 'lucide-react';
+import { KERALA_DISTRICTS } from '../../data/districts';
 
 export const StudentsMasterDirectory = () => {
   const {
@@ -9,6 +10,7 @@ export const StudentsMasterDirectory = () => {
     courses,
     centres,
     updateStudentFee,
+    updateStudentProfile,
     deleteStudentEnrollment,
     deleteStudentCompletely,
     showToast,
@@ -24,6 +26,82 @@ export const StudentsMasterDirectory = () => {
   const [studentToDelete, setStudentToDelete] = useState(null);
   const [deleteScope, setDeleteScope] = useState('ALL'); // 'ALL' | 'THIS_COURSE_ONLY'
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Student Edit State
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    student_name: '',
+    gender: '',
+    date_of_birth: '',
+    phone: '',
+    place: '',
+    district: 'Malappuram',
+    student_profile_id: ''
+  });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const handleOpenEdit = (enr) => {
+    const cleanPhone = (enr.account_phone || '').trim().replace(/\D/g, '').slice(-10);
+    const account = students.find(s => (s.account_phone || '').trim().replace(/\D/g, '').slice(-10) === cleanPhone);
+    const member = account?.members?.find(m => 
+      (enr.student_profile_id && m.id === enr.student_profile_id) ||
+      m.full_name?.toLowerCase() === (enr.student_name || '').toLowerCase()
+    ) || account?.members?.[0];
+
+    setEditingStudent(enr);
+    setEditFormData({
+      student_name: enr.student_name || member?.full_name || '',
+      gender: enr.gender || member?.gender || '',
+      date_of_birth: enr.date_of_birth || member?.date_of_birth || '',
+      phone: cleanPhone,
+      place: member?.place || '',
+      district: member?.district || 'Malappuram',
+      student_profile_id: enr.student_profile_id || member?.id || ''
+    });
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    if (!editFormData.student_name.trim()) {
+      showToast('Please enter student full name', 'warning');
+      return;
+    }
+    if (!editFormData.gender) {
+      showToast('Please select Gender (Male or Female)', 'warning');
+      return;
+    }
+    if (!editFormData.date_of_birth) {
+      showToast('Please enter Date of Birth', 'warning');
+      return;
+    }
+    const cleanPhone = editFormData.phone.trim().replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      showToast('Please enter a valid 10-digit mobile number', 'warning');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      await updateStudentProfile({
+        enrollmentId: editingStudent.id,
+        account_phone: editingStudent.account_phone,
+        student_profile_id: editFormData.student_profile_id,
+        full_name: editFormData.student_name.trim(),
+        gender: editFormData.gender,
+        date_of_birth: editFormData.date_of_birth,
+        place: editFormData.place.trim(),
+        district: editFormData.district,
+        new_phone: cleanPhone
+      });
+      setEditingStudent(null);
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to update student profile', 'error');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -67,6 +145,8 @@ export const StudentsMasterDirectory = () => {
       'Admission No',
       'Student Name',
       'Phone Number',
+      'Gender',
+      'Date of Birth',
       'Course Title',
       'Centre / Venue',
       'Enrollment Date',
@@ -77,19 +157,32 @@ export const StudentsMasterDirectory = () => {
       'Custom Intake Answers'
     ];
 
-    const rows = filteredEnrollments.map(e => [
-      `"${e.admission_number}"`,
-      `"${e.student_name}"`,
-      `"${e.account_phone}"`,
-      `"${e.course_title}"`,
-      `"${e.centre_name || 'N/A'}"`,
-      `"${e.enrollment_date}"`,
-      `"${e.fee_status}"`,
-      e.amount_paid,
-      e.classes_attended || 0,
-      `"${e.completion_status}"`,
-      `"${JSON.stringify(e.custom_responses || {}).replace(/"/g, '""')}"`
-    ]);
+    const rows = filteredEnrollments.map(e => {
+      const cleanPhone = (e.account_phone || '').trim().replace(/\D/g, '').slice(-10);
+      const account = students.find(s => (s.account_phone || '').trim().replace(/\D/g, '').slice(-10) === cleanPhone);
+      const member = account?.members?.find(m => 
+        (e.student_profile_id && m.id === e.student_profile_id) ||
+        m.full_name?.toLowerCase() === (e.student_name || '').toLowerCase()
+      ) || account?.members?.[0];
+      const g = e.gender || member?.gender || '';
+      const dob = e.date_of_birth || member?.date_of_birth || '';
+
+      return [
+        `"${e.admission_number}"`,
+        `"${e.student_name}"`,
+        `"${e.account_phone}"`,
+        `"${g}"`,
+        `"${dob}"`,
+        `"${e.course_title}"`,
+        `"${e.centre_name || 'N/A'}"`,
+        `"${e.enrollment_date}"`,
+        `"${e.fee_status}"`,
+        e.amount_paid,
+        e.classes_attended || 0,
+        `"${e.completion_status}"`,
+        `"${JSON.stringify(e.custom_responses || {}).replace(/"/g, '""')}"`
+      ];
+    });
 
     const csvString = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
     const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
@@ -217,9 +310,58 @@ export const StudentsMasterDirectory = () => {
                       <strong style={{ display: 'block', color: 'var(--cpet-primary)', fontSize: '0.92rem' }}>
                         {enr.student_name}
                       </strong>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--cpet-text-muted)' }}>
-                        📱 {enr.account_phone}
-                      </span>
+                      {(() => {
+                        const cleanPhone = (enr.account_phone || '').trim().replace(/\D/g, '').slice(-10);
+                        const account = students.find(s => (s.account_phone || '').trim().replace(/\D/g, '').slice(-10) === cleanPhone);
+                        const member = account?.members?.find(m => 
+                          (enr.student_profile_id && m.id === enr.student_profile_id) ||
+                          m.full_name?.toLowerCase() === (enr.student_name || '').toLowerCase()
+                        ) || account?.members?.[0];
+                        const enrGender = enr.gender || member?.gender;
+                        const enrDoB = enr.date_of_birth || member?.date_of_birth;
+
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '3px' }}>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--cpet-text-muted)' }}>
+                              📱 {enr.account_phone}
+                            </span>
+                            {enrGender ? (
+                              <span style={{
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                background: enrGender.toUpperCase() === 'FEMALE' ? '#fdf2f8' : '#eff6ff',
+                                color: enrGender.toUpperCase() === 'FEMALE' ? '#be185d' : '#1d4ed8',
+                                border: `1px solid ${enrGender.toUpperCase() === 'FEMALE' ? '#fbcfe8' : '#bfdbfe'}`
+                              }}>
+                                {enrGender.toUpperCase() === 'FEMALE' ? '♀ Female' : '♂ Male'}
+                              </span>
+                            ) : (
+                              <span style={{
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                background: '#fef3c7',
+                                color: '#b45309',
+                                border: '1px solid #fde68a'
+                              }}>
+                                ⚠️ No Gender
+                              </span>
+                            )}
+                            {enrDoB ? (
+                              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                🎂 {enrDoB}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.7rem', color: '#dc2626', fontWeight: 600 }}>
+                                🎂 Missing DoB
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td>
                       <strong style={{ fontSize: '0.88rem' }}>{enr.course_title}</strong>
@@ -278,6 +420,18 @@ export const StudentsMasterDirectory = () => {
                           <MessageCircle size={14} />
                         </a>
 
+                        {/* Edit Student Profile */}
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          style={{ color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          onClick={() => handleOpenEdit(enr)}
+                          title="Edit Student Information (Gender, DoB, Phone, Name)"
+                        >
+                          <Edit2 size={13} />
+                          <span className="hide-on-mobile">Edit</span>
+                        </button>
+
                         {/* View 360° Profile */}
                         <button
                           className="btn btn-secondary btn-sm"
@@ -329,18 +483,33 @@ export const StudentsMasterDirectory = () => {
             <div className="modal-body">
               {/* Identity Header */}
               <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--cpet-border)', marginBottom: '1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
                   <div>
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--cpet-primary)' }}>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--cpet-primary)', margin: 0 }}>
                       {selectedStudentFor360.student_name}
                     </h2>
-                    <p style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '4px 0 0 0' }}>
                       Registered Mobile: <strong>+91 {selectedStudentFor360.account_phone}</strong>
                     </p>
                   </div>
-                  <span className="badge badge-primary">
-                    {selectedStudentFor360.admission_number}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      onClick={() => {
+                        const target = selectedStudentFor360;
+                        setSelectedStudentFor360(null);
+                        handleOpenEdit(target);
+                      }}
+                      title="Edit Student Information"
+                    >
+                      <Edit2 size={13} /> Edit Profile
+                    </button>
+                    <span className="badge badge-primary">
+                      {selectedStudentFor360.admission_number}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -578,6 +747,197 @@ export const StudentsMasterDirectory = () => {
                 <span>{isDeleting ? 'Erasing Records...' : 'Permanently Delete Student'}</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Student Information Modal */}
+      {editingStudent && (
+        <div className="modal-overlay" onClick={() => !isSavingEdit && setEditingStudent(null)}>
+          <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
+            <form onSubmit={handleSaveEdit}>
+              <div className="modal-header" style={{ borderBottom: '1px solid var(--cpet-border)', background: '#f8fafc' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+                    <Edit2 size={16} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, color: 'var(--cpet-primary)', fontSize: '1.15rem', fontWeight: 800 }}>Edit Student Information</h3>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--cpet-text-muted)' }}>
+                      Admission No: <strong style={{ fontFamily: 'monospace' }}>{editingStudent.admission_number}</strong>
+                    </p>
+                  </div>
+                </div>
+                {!isSavingEdit && (
+                  <button type="button" className="modal-close-btn" onClick={() => setEditingStudent(null)}>✕</button>
+                )}
+              </div>
+
+              <div className="modal-body" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', fontSize: '0.8rem', color: '#166534' }}>
+                  💡 <strong>Quick Fix:</strong> Correct the student's gender (Male/Female) and enter Date of Birth. All course records and cloud database will update automatically.
+                </div>
+
+                {/* Full Name */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                    Student Full Name <span style={{ color: '#dc2626' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    required
+                    value={editFormData.student_name}
+                    onChange={e => setEditFormData({ ...editFormData, student_name: e.target.value })}
+                    placeholder="Enter student's official name"
+                  />
+                </div>
+
+                {/* Gender - Quick Toggle Pills + Select */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                    Gender <span style={{ color: '#dc2626' }}>*</span>
+                  </label>
+                  
+                  {/* Quick 1-click Toggle buttons */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setEditFormData({ ...editFormData, gender: 'FEMALE' })}
+                      style={{
+                        padding: '0.75rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: editFormData.gender === 'FEMALE' ? '2px solid #db2777' : '1px solid #e2e8f0',
+                        background: editFormData.gender === 'FEMALE' ? '#fdf2f8' : 'white',
+                        color: editFormData.gender === 'FEMALE' ? '#be185d' : '#475569',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span>♀ Female</span>
+                      {editFormData.gender === 'FEMALE' && <CheckCircle size={15} color="#db2777" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEditFormData({ ...editFormData, gender: 'MALE' })}
+                      style={{
+                        padding: '0.75rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: editFormData.gender === 'MALE' ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                        background: editFormData.gender === 'MALE' ? '#eff6ff' : 'white',
+                        color: editFormData.gender === 'MALE' ? '#1d4ed8' : '#475569',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span>♂ Male</span>
+                      {editFormData.gender === 'MALE' && <CheckCircle size={15} color="#2563eb" />}
+                    </button>
+                  </div>
+
+                  {!editFormData.gender && (
+                    <span style={{ fontSize: '0.75rem', color: '#dc2626' }}>
+                      Please select either Female or Male
+                    </span>
+                  )}
+                </div>
+
+                {/* Date of Birth & Mobile Phone */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                      Date of Birth <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      required
+                      value={editFormData.date_of_birth}
+                      onChange={e => setEditFormData({ ...editFormData, date_of_birth: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                      Mobile Number <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      className="form-control"
+                      required
+                      maxLength={10}
+                      value={editFormData.phone}
+                      onChange={e => setEditFormData({ ...editFormData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                      placeholder="10-digit mobile"
+                    />
+                  </div>
+                </div>
+
+                {/* District & Place */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                      District
+                    </label>
+                    <select
+                      className="form-select"
+                      value={editFormData.district}
+                      onChange={e => setEditFormData({ ...editFormData, district: e.target.value })}
+                    >
+                      {KERALA_DISTRICTS.map(dist => (
+                        <option key={dist} value={dist}>{dist}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                      Place / Mahallu
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editFormData.place}
+                      onChange={e => setEditFormData({ ...editFormData, place: e.target.value })}
+                      placeholder="e.g. Chemmad"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ borderTop: '1px solid var(--cpet-border)', padding: '0.85rem 1.25rem', display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={isSavingEdit}
+                  onClick={() => setEditingStudent(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  disabled={isSavingEdit}
+                >
+                  <CheckCircle size={15} />
+                  <span>{isSavingEdit ? 'Saving Changes...' : 'Save Profile Changes'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

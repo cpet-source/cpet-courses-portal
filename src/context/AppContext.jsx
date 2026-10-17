@@ -913,6 +913,106 @@ export const AppProvider = ({ children }) => {
     return newEnrollment;
   };
 
+  // Update student profile details (gender, DoB, name, location, phone)
+  const updateStudentProfile = ({
+    enrollmentId,
+    account_phone,
+    student_profile_id,
+    full_name,
+    gender,
+    date_of_birth,
+    place,
+    district,
+    new_phone
+  }) => {
+    const cleanPhone = (account_phone || '').trim().replace(/\D/g, '').slice(-10);
+    const cleanNewPhone = new_phone ? (new_phone || '').trim().replace(/\D/g, '').slice(-10) : cleanPhone;
+
+    // 1. Update StudentAccount and member details
+    setStudents(prev => {
+      let foundAccount = prev.find(a => (a.account_phone || '').trim().replace(/\D/g, '').slice(-10) === cleanPhone);
+
+      // If account doesn't exist yet, synthesize one
+      if (!foundAccount) {
+        const newMember = {
+          id: student_profile_id || `prof-${Date.now()}`,
+          full_name: full_name || 'Student',
+          gender: gender || 'MALE',
+          date_of_birth: date_of_birth || '',
+          place: place || '',
+          district: district || 'Kerala',
+          relationship: 'Self'
+        };
+        const newAccount = {
+          account_phone: cleanNewPhone,
+          whatsapp_number: cleanNewPhone,
+          members: [newMember]
+        };
+        syncToCloud('StudentAccount', newAccount);
+        return [...prev, newAccount];
+      }
+
+      const updatedMembers = (foundAccount.members || []).map(m => {
+        const isTargetMember = (student_profile_id && m.id === student_profile_id) || 
+          (!student_profile_id && m.full_name?.toLowerCase() === (full_name || '').toLowerCase()) ||
+          foundAccount.members.length === 1;
+
+        if (isTargetMember) {
+          return {
+            ...m,
+            full_name: full_name !== undefined ? full_name : m.full_name,
+            gender: gender !== undefined ? gender : m.gender,
+            date_of_birth: date_of_birth !== undefined ? date_of_birth : m.date_of_birth,
+            place: place !== undefined ? place : m.place,
+            district: district !== undefined ? district : m.district
+          };
+        }
+        return m;
+      });
+
+      // If phone changed, delete old account from cloud
+      if (cleanNewPhone !== cleanPhone) {
+        deleteFromCloud('StudentAccount', null, { account_phone: cleanPhone });
+      }
+
+      const accountUpdated = {
+        ...foundAccount,
+        account_phone: cleanNewPhone,
+        members: updatedMembers
+      };
+      syncToCloud('StudentAccount', accountUpdated);
+
+      return prev.map(a => 
+        (a.account_phone || '').trim().replace(/\D/g, '').slice(-10) === cleanPhone ? accountUpdated : a
+      );
+    });
+
+    // 2. Update Enrollments matching this student
+    setEnrollments(prev => prev.map(enr => {
+      const p = (enr.account_phone || '').trim().replace(/\D/g, '').slice(-10);
+      const isTarget = enr.id === enrollmentId || 
+        (p === cleanPhone && (
+          (student_profile_id && enr.student_profile_id === student_profile_id) ||
+          enr.student_name?.toLowerCase() === (full_name || '').toLowerCase()
+        ));
+
+      if (isTarget) {
+        const updatedEnr = {
+          ...enr,
+          student_name: full_name !== undefined ? full_name : enr.student_name,
+          account_phone: cleanNewPhone,
+          gender: gender !== undefined ? gender : enr.gender,
+          date_of_birth: date_of_birth !== undefined ? date_of_birth : enr.date_of_birth
+        };
+        syncToCloud('Enrollment', updatedEnr);
+        return updatedEnr;
+      }
+      return enr;
+    }));
+
+    showToast(`Updated student profile for "${full_name}"!`);
+  };
+
   // Delete a specific student enrollment and cascade-clean member profile if no other courses exist
   const deleteStudentEnrollment = (enrollmentId) => {
     const target = enrollments.find(e => e.id === enrollmentId);
@@ -1375,6 +1475,7 @@ export const AppProvider = ({ children }) => {
         setVolunteerCourseTarget,
         updateStudentMarks,
         updateStudentFee,
+        updateStudentProfile,
         deleteStudentEnrollment,
         deleteStudentCompletely,
         markStudentAttendance,

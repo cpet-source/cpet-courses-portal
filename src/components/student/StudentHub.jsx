@@ -236,7 +236,8 @@ export const StudentHub = () => {
                               {selectedMember.full_name}
                             </h3>
                             <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '3px' }}>
-                              Gender: {selectedMember.gender} | Location: {selectedMember.place || 'Kerala'} | Relationship: {selectedMember.relationship}
+                              Gender: <strong style={{ color: selectedMember.gender?.toUpperCase() === 'FEMALE' ? '#be185d' : '#1d4ed8' }}>{selectedMember.gender ? (selectedMember.gender.toUpperCase() === 'FEMALE' ? 'Female' : 'Male') : 'Not specified'}</strong>
+                              {selectedMember.date_of_birth && ` | DoB: ${selectedMember.date_of_birth}`} | Location: {selectedMember.place ? `${selectedMember.place}, ${selectedMember.district || ''}` : (selectedMember.district || 'Kerala')}
                             </p>
                           </div>
                           <button

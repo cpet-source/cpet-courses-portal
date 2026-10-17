@@ -14,7 +14,7 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
   // New Profile Form (if creating new member)
   const [newMemberData, setNewMemberData] = useState({
     full_name: '',
-    gender: 'MALE',
+    gender: '', // No default - student must explicitly choose
     date_of_birth: '',
     place: '',
     district: 'Malappuram',
@@ -121,6 +121,22 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    // Validate new member details if not selecting existing profile
+    if (!selectedMemberId) {
+      if (!newMemberData.full_name || !newMemberData.full_name.trim()) {
+        showToast('Please enter candidate full name', 'danger');
+        return;
+      }
+      if (!newMemberData.gender) {
+        showToast('Please select your gender (Male / Female)', 'danger');
+        return;
+      }
+      if (!newMemberData.date_of_birth) {
+        showToast('Date of Birth is compulsory. Please select your date of birth.', 'danger');
+        return;
+      }
+    }
 
     // Validate custom required questions
     for (const q of (course.custom_questions || [])) {
@@ -389,18 +405,21 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
                   <label className="form-label">Gender <span className="required">*</span></label>
                   <select
                     className="form-select"
+                    required
                     value={newMemberData.gender}
                     onChange={e => setNewMemberData({ ...newMemberData, gender: e.target.value })}
                   >
+                    <option value="">-- Select Gender * --</option>
                     <option value="MALE">Male</option>
                     <option value="FEMALE">Female</option>
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Date of Birth</label>
+                  <label className="form-label">Date of Birth <span className="required">*</span></label>
                   <input
                     type="date"
                     className="form-input"
+                    required
                     value={newMemberData.date_of_birth}
                     onChange={e => setNewMemberData({ ...newMemberData, date_of_birth: e.target.value })}
                   />
