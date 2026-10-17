@@ -669,6 +669,29 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
           </button>
         </form>
       )}
+
+      {/* Back to courses button below the registration section (visible on scroll down) */}
+      {onBack && (
+        <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--cpet-border)', textAlign: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={onBack}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              color: '#475569',
+              fontSize: '0.85rem',
+              padding: '0.45rem 1rem'
+            }}
+          >
+            <ArrowLeft size={15} />
+            <span>Back to All Courses</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };
