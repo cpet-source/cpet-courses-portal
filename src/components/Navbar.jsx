@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { LoginModal } from './auth/LoginModal';
-import { ShieldCheck, GraduationCap, Users, Lock, LogOut, Building2, Cloud, AlertCircle, UserCheck } from 'lucide-react';
+import { ShieldCheck, GraduationCap, Users, Lock, LogOut, Building2, Cloud, AlertCircle } from 'lucide-react';
 
 export const Navbar = () => {
   const {
@@ -154,16 +154,6 @@ export const Navbar = () => {
                   <Cloud size={12} /> Cloud Connected
                 </span>
               )}
-
-              <button
-                className="btn btn-outline btn-sm hide-on-mobile"
-                onClick={() => setActiveRole('volunteer_desk')}
-                style={{ fontSize: '0.8rem', borderColor: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '4px' }}
-                title="Open Event Entrance Check-In Desk for Volunteers"
-              >
-                <UserCheck size={13} />
-                <span>Gate Desk</span>
-              </button>
 
               {/* Hide Office & Faculty Login on course registration links to maximize screen space for students */}
               {!(() => {
