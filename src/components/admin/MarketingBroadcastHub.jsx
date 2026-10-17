@@ -65,19 +65,28 @@ export const MarketingBroadcastHub = () => {
   // 4. Meta Cloud API Configuration State
   const [metaConfig, setMetaConfig] = useState(() => {
     const defaultPermanentToken = 'EAAZA7fKz6vxEBS0cj5ZAOjO5ggJ3WmMRHqNSgqrhVlFKAQzruKfgCwSQPcwUbm7Fcbu7HEVBAA1U29v9QqSXpNGxbnHZBwrG9lrwhCzOupphm4oYWJDg4vm4H2R280YvYA8gIRUk44wnMuuBf5fuou1W728ET1ZBskj08cE18GAeqtJs3iuqsxBYtQneCwZDZD';
+    const defaultPhoneNumberId = '1335831969620380';
     try {
       const stored = localStorage.getItem(META_CONFIG_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
+        let updated = false;
         if (!parsed.accessToken || parsed.accessToken.length < 50) {
           parsed.accessToken = defaultPermanentToken;
+          updated = true;
+        }
+        if (!parsed.phoneNumberId || parsed.phoneNumberId !== defaultPhoneNumberId) {
+          parsed.phoneNumberId = defaultPhoneNumberId;
+          updated = true;
+        }
+        if (updated) {
           localStorage.setItem(META_CONFIG_STORAGE_KEY, JSON.stringify(parsed));
         }
         return parsed;
       }
     } catch (e) {}
     return {
-      phoneNumberId: '',
+      phoneNumberId: defaultPhoneNumberId,
       wabaId: '',
       accessToken: defaultPermanentToken,
       templateName: 'cpet_course_admission',
