@@ -66,6 +66,7 @@ export const MarketingBroadcastHub = () => {
   const [metaConfig, setMetaConfig] = useState(() => {
     const defaultPermanentToken = 'EAAZA7fKz6vxEBS0cj5ZAOjO5ggJ3WmMRHqNSgqrhVlFKAQzruKfgCwSQPcwUbm7Fcbu7HEVBAA1U29v9QqSXpNGxbnHZBwrG9lrwhCzOupphm4oYWJDg4vm4H2R280YvYA8gIRUk44wnMuuBf5fuou1W728ET1ZBskj08cE18GAeqtJs3iuqsxBYtQneCwZDZD';
     const defaultPhoneNumberId = '1335831969620380';
+    const defaultWabaId = '4167730996858537';
     try {
       const stored = localStorage.getItem(META_CONFIG_STORAGE_KEY);
       if (stored) {
@@ -79,6 +80,10 @@ export const MarketingBroadcastHub = () => {
           parsed.phoneNumberId = defaultPhoneNumberId;
           updated = true;
         }
+        if (!parsed.wabaId || parsed.wabaId !== defaultWabaId) {
+          parsed.wabaId = defaultWabaId;
+          updated = true;
+        }
         if (updated) {
           localStorage.setItem(META_CONFIG_STORAGE_KEY, JSON.stringify(parsed));
         }
@@ -87,7 +92,7 @@ export const MarketingBroadcastHub = () => {
     } catch (e) {}
     return {
       phoneNumberId: defaultPhoneNumberId,
-      wabaId: '',
+      wabaId: defaultWabaId,
       accessToken: defaultPermanentToken,
       templateName: 'cpet_course_admission',
       templateLanguage: 'en',
