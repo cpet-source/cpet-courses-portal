@@ -64,14 +64,22 @@ export const MarketingBroadcastHub = () => {
 
   // 4. Meta Cloud API Configuration State
   const [metaConfig, setMetaConfig] = useState(() => {
+    const defaultPermanentToken = 'EAAZA7fKz6vxEBS0cj5ZAOjO5ggJ3WmMRHqNSgqrhVlFKAQzruKfgCwSQPcwUbm7Fcbu7HEVBAA1U29v9QqSXpNGxbnHZBwrG9lrwhCzOupphm4oYWJDg4vm4H2R280YvYA8gIRUk44wnMuuBf5fuou1W728ET1ZBskj08cE18GAeqtJs3iuqsxBYtQneCwZDZD';
     try {
       const stored = localStorage.getItem(META_CONFIG_STORAGE_KEY);
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (!parsed.accessToken || parsed.accessToken.length < 50) {
+          parsed.accessToken = defaultPermanentToken;
+          localStorage.setItem(META_CONFIG_STORAGE_KEY, JSON.stringify(parsed));
+        }
+        return parsed;
+      }
     } catch (e) {}
     return {
       phoneNumberId: '',
       wabaId: '',
-      accessToken: '',
+      accessToken: defaultPermanentToken,
       templateName: 'cpet_course_admission',
       templateLanguage: 'en',
       costPerMessage: 0.80, // Meta marketing conversation rate in India (approx ₹0.80)
