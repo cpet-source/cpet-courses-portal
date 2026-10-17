@@ -165,14 +165,24 @@ export const Navbar = () => {
                 <span>Gate Desk</span>
               </button>
 
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => setShowLoginModal(true)}
-                style={{ background: 'var(--cpet-primary)', fontSize: '0.82rem' }}
-              >
-                <Lock size={13} />
-                <span>Office & Faculty Login</span>
-              </button>
+              {/* Hide Office & Faculty Login on course registration links to maximize screen space for students */}
+              {!(() => {
+                try {
+                  const p = new URLSearchParams(window.location.search);
+                  return Boolean(p.get('course') || p.get('slug') || p.get('id') || p.get('c'));
+                } catch (e) {
+                  return false;
+                }
+              })() && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setShowLoginModal(true)}
+                  style={{ background: 'var(--cpet-primary)', fontSize: '0.82rem' }}
+                >
+                  <Lock size={13} />
+                  <span>Office & Faculty Login</span>
+                </button>
+              )}
             </div>
           )}
         </div>

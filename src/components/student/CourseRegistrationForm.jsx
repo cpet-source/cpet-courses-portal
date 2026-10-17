@@ -180,94 +180,101 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
 
   return (
     <div className="cpet-card" style={{ maxWidth: '680px', margin: '0 auto', overflow: 'hidden' }}>
-      {/* 800x1600 (2:1) Landscape Header Banner */}
-      {course.poster_url && (
+      {/* 800x1600 (2:1) Landscape Header Banner with seamless attached Course Details strip */}
+      <div style={{
+        width: 'calc(100% + 3rem)',
+        margin: '-1.5rem -1.5rem 1rem -1.5rem',
+        overflow: 'hidden',
+        borderBottom: '1px solid var(--cpet-border)'
+      }}>
+        {course.poster_url && (
+          <div style={{
+            width: '100%',
+            aspectRatio: '2 / 1',
+            maxHeight: '340px',
+            overflow: 'hidden',
+            background: '#0f172a'
+          }}>
+            <img
+              src={course.poster_url}
+              alt={course.title}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          </div>
+        )}
+
+        {/* Attached Course Details Strip */}
         <div style={{
-          width: 'calc(100% + 3rem)',
-          margin: '-1.5rem -1.5rem 1.25rem -1.5rem',
-          aspectRatio: '2 / 1',
-          maxHeight: '340px',
-          overflow: 'hidden',
-          background: '#0f172a',
-          borderBottom: '1px solid var(--cpet-border)'
+          background: 'linear-gradient(135deg, var(--cpet-primary) 0%, var(--cpet-accent) 100%)',
+          color: 'white',
+          padding: '0.85rem 1.25rem'
         }}>
-          <img
-            src={course.poster_url}
-            alt={course.title}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
-        </div>
-      )}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
+            <span className="badge" style={{ background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: '0.72rem', padding: '2px 8px' }}>
+              {course.category === 'MAHALLU' ? 'Mahallu Study Centre' :
+               course.category === 'ONLINE' ? 'Online Course' :
+               course.category === 'OFFLINE_WORKSHOP' ? 'Offline Workshop / Camp' :
+               course.category === 'LANGUAGE_ACADEMY' ? 'CPET Language Academy' :
+               course.category.replace(/_/g, ' ')}
+            </span>
+            {!isClosed && !isUpcoming && !isDeadlinePassed && daysRemaining !== null && (
+              <span style={{ fontSize: '0.75rem', color: daysRemaining <= 3 ? '#fde047' : '#86efac', fontWeight: 700 }}>
+                ⏳ {daysRemaining === 0 ? 'Last day to apply!' : `${daysRemaining} days left to apply`}
+              </span>
+            )}
+          </div>
 
-      <button className="btn btn-secondary btn-sm" onClick={onBack} style={{ marginBottom: '1rem' }}>
-        <ArrowLeft size={14} /> Back to Courses
-      </button>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 0.35rem', color: '#ffffff', lineHeight: 1.3 }}>
+            {course.title}
+          </h2>
 
-      {/* Course Banner */}
-      <div style={{ background: 'linear-gradient(135deg, var(--cpet-primary) 0%, var(--cpet-accent) 100%)', color: 'white', padding: '1.25rem', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem' }}>
-        <span className="badge" style={{ background: 'rgba(255,255,255,0.2)', color: 'white', marginBottom: '0.4rem' }}>
-          {course.category === 'MAHALLU' ? 'Mahallu Based Study Centre Course' :
-           course.category === 'ONLINE' ? 'Online Course' :
-           course.category === 'OFFLINE_WORKSHOP' ? 'Offline Workshop / Camp' :
-           course.category === 'LANGUAGE_ACADEMY' ? 'CPET Language Academy' :
-           course.category.replace(/_/g, ' ')}
-        </span>
-        <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0.2rem 0' }}>{course.title}</h2>
-        <p style={{ fontSize: '0.85rem', opacity: 0.9, margin: 0 }}>{course.description}</p>
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', fontSize: '0.82rem', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '0.5rem', flexWrap: 'wrap' }}>
-          {!isMahallu && (
-            <span>Fee: <strong>{course.standard_fee > 0 ? `₹${course.standard_fee}` : 'FREE'}</strong></span>
-          )}
-          {!isMahallu && activeBatch && (
-            <span>Intake: <strong>{activeBatch.batch_name}</strong></span>
-          )}
-          <span>Classes: <strong>{course.total_planned_classes} Sessions</strong></span>
-          <span>Evaluation: <strong>{course.evaluation_type === 'NONE' ? 'No Exam / Open' : course.evaluation_type.replace('_', ' ')}</strong></span>
+          <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.8rem', opacity: 0.95, flexWrap: 'wrap', alignItems: 'center' }}>
+            {!isMahallu && (
+              <span>Fee: <strong style={{ color: '#fde047' }}>{course.standard_fee > 0 ? `₹${course.standard_fee}` : 'FREE'}</strong></span>
+            )}
+            {!isMahallu && activeBatch && (
+              <span>• Intake: <strong>{activeBatch.batch_name}</strong></span>
+            )}
+            {course.total_planned_classes > 0 && (
+              <span>• Classes: <strong>{course.total_planned_classes} Sessions</strong></span>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Registration Timeline / Closed Banner */}
       {isClosed && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <AlertCircle size={22} color="#dc2626" />
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', padding: '0.85rem 1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <AlertCircle size={20} color="#dc2626" />
           <div>
-            <strong style={{ color: '#991b1b', display: 'block', fontSize: '0.92rem' }}>Registration Closed</strong>
-            <span style={{ fontSize: '0.82rem', color: '#b91c1c' }}>
-              Admissions for this program are currently closed. Please check back for upcoming batches.
+            <strong style={{ color: '#991b1b', display: 'block', fontSize: '0.9rem' }}>Registration Closed</strong>
+            <span style={{ fontSize: '0.8rem', color: '#b91c1c' }}>
+              Admissions for this program are currently closed.
             </span>
           </div>
         </div>
       )}
 
       {isUpcoming && (
-        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <Clock size={22} color="#2563eb" />
+        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 'var(--radius-md)', padding: '0.85rem 1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <Clock size={20} color="#2563eb" />
           <div>
-            <strong style={{ color: '#1e40af', display: 'block', fontSize: '0.92rem' }}>Registration Opening Soon</strong>
-            <span style={{ fontSize: '0.82rem', color: '#1d4ed8' }}>
-              Applications for this program will open soon. Please stay tuned!
+            <strong style={{ color: '#1e40af', display: 'block', fontSize: '0.9rem' }}>Registration Opening Soon</strong>
+            <span style={{ fontSize: '0.8rem', color: '#1d4ed8' }}>
+              Applications for this program will open soon.
             </span>
           </div>
         </div>
       )}
 
       {!isClosed && !isUpcoming && isDeadlinePassed && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <AlertCircle size={22} color="#dc2626" />
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', padding: '0.85rem 1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <AlertCircle size={20} color="#dc2626" />
           <div>
-            <strong style={{ color: '#991b1b', display: 'block', fontSize: '0.92rem' }}>Application Deadline Passed</strong>
-            <span style={{ fontSize: '0.82rem', color: '#b91c1c' }}>
+            <strong style={{ color: '#991b1b', display: 'block', fontSize: '0.9rem' }}>Application Deadline Passed</strong>
+            <span style={{ fontSize: '0.8rem', color: '#b91c1c' }}>
               The registration deadline ({course.registration_deadline}) has ended.
             </span>
-          </div>
-        </div>
-      )}
-
-      {!isClosed && !isUpcoming && !isDeadlinePassed && daysRemaining !== null && (
-        <div style={{ background: daysRemaining <= 3 ? '#fffbeb' : '#f0fdf4', border: daysRemaining <= 3 ? '1px solid #fde68a' : '1px solid #bbf7d0', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <Clock size={18} color={daysRemaining <= 3 ? '#d97706' : '#16a34a'} />
-          <div style={{ fontSize: '0.85rem', color: daysRemaining <= 3 ? '#92400e' : '#166534', fontWeight: 600 }}>
-            {daysRemaining === 0 ? '🔥 Last day to apply! Registration closes tonight.' : `⏳ Only ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left to register! (Deadline: ${course.registration_deadline})`}
           </div>
         </div>
       )}
@@ -275,16 +282,15 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
       {/* Step 1: Mobile Phone Verification */}
       {!hasCheckedPhone ? (
         <form onSubmit={handlePhoneLookup}>
-          <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--cpet-border)', marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--cpet-primary)', marginBottom: '0.4rem' }}>
+          <div style={{ background: '#f8fafc', padding: '1rem 1.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--cpet-border)', marginBottom: '1.25rem' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--cpet-primary)', margin: '0 0 0.5rem' }}>
               Step 1: Enter Your Mobile Number
             </h3>
-            <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '1rem' }}>
-              No password needed! Entering your phone number links all your courses together into one lifetime CPET record.
-            </p>
 
-            <div className="form-group">
-              <label className="form-label">WhatsApp / Contact Mobile Number <span className="required">*</span></label>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                WhatsApp / Contact Mobile Number <span className="required">*</span>
+              </label>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <input
                   type="tel"
@@ -293,15 +299,20 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
                   disabled={isRegistrationBlocked}
                   placeholder="e.g. 9895112233"
                   value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  style={{ fontSize: '1.05rem', fontWeight: 600 }}
+                  onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  style={{ fontSize: '1.05rem', fontWeight: 600, letterSpacing: '0.05em' }}
                 />
-                <button type="submit" className="btn btn-primary" disabled={isRegistrationBlocked}>
-                  Continue
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isRegistrationBlocked || phone.length < 10}
+                  style={{ whiteSpace: 'nowrap', padding: '0 1.35rem', fontWeight: 700 }}
+                >
+                  Continue ➔
                 </button>
               </div>
               {isRegistrationBlocked && (
-                <span className="form-helper" style={{ color: '#dc2626' }}>
+                <span className="form-helper" style={{ color: '#dc2626', marginTop: '4px', display: 'block' }}>
                   Admissions for this program are currently closed.
                 </span>
               )}
