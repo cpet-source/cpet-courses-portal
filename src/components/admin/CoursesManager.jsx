@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download, Building, Upload, Image as ImageIcon, Users, Layers, Search, Filter, X, AlertCircle, UserCheck } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download, Building, Upload, Image as ImageIcon, Users, Layers, Search, Filter, X, AlertCircle, UserCheck, Table, ClipboardList } from 'lucide-react';
 
 export const CoursesManager = () => {
   const {
@@ -30,6 +30,7 @@ export const CoursesManager = () => {
   const [selectedCohortFilter, setSelectedCohortFilter] = useState('ALL');
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [studentFeeFilter, setStudentFeeFilter] = useState('ALL');
+  const [rosterTab, setRosterTab] = useState('STUDENTS'); // 'STUDENTS' | 'RESPONSES'
 
   // Form State
   const [formData, setFormData] = useState({
@@ -380,6 +381,8 @@ export const CoursesManager = () => {
       return;
     }
 
+    const customQuestions = currentModalCourse.custom_questions || [];
+
     const headers = [
       'Admission Number',
       'Student Name',
@@ -389,24 +392,39 @@ export const CoursesManager = () => {
       'Centre / Batch',
       'Fee Status',
       'Amount Paid (INR)',
+      ...customQuestions.map(q => `"${(q.label || 'Question').replace(/"/g, '""')}"`),
+      'Payment UTR / Ref',
       'Classes Attended',
       'Completion Status',
       'Enrollment Date'
     ];
 
-    const rows = modalFilteredStudents.map(e => [
-      `"${e.admission_number || ''}"`,
-      `"${(e.student_name || '').replace(/"/g, '""')}"`,
-      `"${e.account_phone || ''}"`,
-      `"${currentModalCourse.course_code || ''}"`,
-      `"${(currentModalCourse.title || '').replace(/"/g, '""')}"`,
-      `"${(e.centre_name || e.batch_name || 'General').replace(/"/g, '""')}"`,
-      `"${e.fee_status || ''}"`,
-      e.amount_paid || 0,
-      e.classes_attended || 0,
-      `"${e.completion_status || ''}"`,
-      `"${e.enrollment_date || ''}"`
-    ]);
+    const rows = modalFilteredStudents.map(e => {
+      const qAnswers = customQuestions.map(q => {
+        const val = e.custom_responses?.[q.id] !== undefined
+          ? e.custom_responses[q.id]
+          : (e.custom_responses?.[q.label] !== undefined ? e.custom_responses[q.label] : '');
+        return `"${String(val || '').replace(/"/g, '""')}"`;
+      });
+
+      const utrVal = e.custom_responses?.['Payment UTR / Ref'] || '';
+
+      return [
+        `"${e.admission_number || ''}"`,
+        `"${(e.student_name || '').replace(/"/g, '""')}"`,
+        `"${e.account_phone || ''}"`,
+        `"${currentModalCourse.course_code || ''}"`,
+        `"${(currentModalCourse.title || '').replace(/"/g, '""')}"`,
+        `"${(e.centre_name || e.batch_name || 'General').replace(/"/g, '""')}"`,
+        `"${e.fee_status || ''}"`,
+        e.amount_paid || 0,
+        ...qAnswers,
+        `"${String(utrVal).replace(/"/g, '""')}"`,
+        e.classes_attended || 0,
+        `"${e.completion_status || ''}"`,
+        `"${e.enrollment_date || ''}"`
+      ];
+    });
 
     const csvString = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
     const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
@@ -414,13 +432,14 @@ export const CoursesManager = () => {
     const link = document.createElement('a');
     link.setAttribute('href', url);
     const cohortSlug = selectedCohortFilter !== 'ALL' ? `_${selectedCohortFilter}` : '';
-    link.setAttribute('download', `CPET_${(currentModalCourse.course_code || 'course').toLowerCase()}${cohortSlug}_students_${new Date().toISOString().split('T')[0]}.csv`);
+    const filePrefix = rosterTab === 'RESPONSES' ? 'form_responses' : 'students';
+    link.setAttribute('download', `CPET_${(currentModalCourse.course_code || 'course').toLowerCase()}${cohortSlug}_${filePrefix}_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    showToast(`Exported ${modalFilteredStudents.length} students to Excel (CSV)!`);
+    showToast(`Exported ${modalFilteredStudents.length} rows to Excel (CSV)!`);
   };
 
   return (
@@ -562,9 +581,22 @@ export const CoursesManager = () => {
                   </span>
                 )}
                 {course.custom_questions && course.custom_questions.length > 0 && (
-                  <span className="badge badge-accent">
-                    {course.custom_questions.length} Custom Intake Questions
-                  </span>
+                  <button
+                    type="button"
+                    className="badge badge-accent"
+                    style={{ cursor: 'pointer', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    onClick={() => {
+                      setSelectedCourseForStudentsModal(course);
+                      setRosterTab('RESPONSES');
+                      setSelectedCohortFilter('ALL');
+                      setStudentSearchQuery('');
+                      setStudentFeeFilter('ALL');
+                    }}
+                    title="View questionnaire responses spreadsheet"
+                  >
+                    <Table size={12} />
+                    <span>{course.custom_questions.length} Form Questions • View Responses ({enrollments.filter(e => e.course_id === course.id).length})</span>
+                  </button>
                 )}
                 {course.payment_policy && (
                   <span className="badge badge-neutral">
@@ -840,6 +872,7 @@ export const CoursesManager = () => {
                 }}
                 onClick={() => {
                   setSelectedCourseForStudentsModal(course);
+                  setRosterTab('ENROLLED');
                   setSelectedCohortFilter('ALL');
                   setStudentSearchQuery('');
                   setStudentFeeFilter('ALL');
@@ -848,6 +881,35 @@ export const CoursesManager = () => {
                 <Users size={15} />
                 <span>View Enrolled Students ({enrollments.filter(e => e.course_id === course.id).length})</span>
               </button>
+
+              {course.custom_questions && course.custom_questions.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  style={{
+                    width: '100%',
+                    marginTop: '0.4rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    fontWeight: 700,
+                    color: '#6d28d9',
+                    borderColor: '#c4b5fd',
+                    background: '#f5f3ff'
+                  }}
+                  onClick={() => {
+                    setSelectedCourseForStudentsModal(course);
+                    setRosterTab('RESPONSES');
+                    setSelectedCohortFilter('ALL');
+                    setStudentSearchQuery('');
+                    setStudentFeeFilter('ALL');
+                  }}
+                >
+                  <ClipboardList size={15} />
+                  <span>View Form Responses ({enrollments.filter(e => e.course_id === course.id).length})</span>
+                </button>
+              )}
             </div>
 
             {/* Actions Footer */}
@@ -939,7 +1001,7 @@ export const CoursesManager = () => {
         <div className="modal-overlay" onClick={() => setSelectedCourseForStudentsModal(null)}>
           <div
             className="modal-content"
-            style={{ maxWidth: '960px', width: '95%', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
+            style={{ maxWidth: '1180px', width: '96%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
             onClick={e => e.stopPropagation()}
           >
             <div className="modal-header" style={{ paddingBottom: '0.5rem' }}>
@@ -954,13 +1016,42 @@ export const CoursesManager = () => {
                   <span className={`badge ${getCategoryBadgeClass(currentModalCourse?.category)}`} style={{ fontSize: '0.75rem' }}>
                     {getCategoryLabel(currentModalCourse?.category)}
                   </span>
+                  {currentModalCourse?.custom_questions?.length > 0 && (
+                    <span className="badge badge-accent" style={{ fontSize: '0.75rem' }}>
+                      {currentModalCourse.custom_questions.length} Custom Questions
+                    </span>
+                  )}
                 </div>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
-                  Course-specific Student Roster & Cohort Management
+                  Course-specific Student Roster & Questionnaire Responses Desk
                 </p>
               </div>
               <button className="modal-close-btn" onClick={() => setSelectedCourseForStudentsModal(null)}>✕</button>
             </div>
+
+            {/* View Switcher Tabs (Students Roster vs Form Responses) */}
+            {currentModalCourse?.custom_questions?.length > 0 && (
+              <div style={{ display: 'flex', gap: '0.5rem', padding: '0.5rem 1rem 0', background: '#f8fafc', borderBottom: '1px solid var(--cpet-border)' }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${rosterTab === 'STUDENTS' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setRosterTab('STUDENTS')}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', borderRadius: '6px 6px 0 0', fontWeight: 700 }}
+                >
+                  <Users size={14} />
+                  <span>Enrolled Students Roster ({courseEnrollments.length})</span>
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${rosterTab === 'RESPONSES' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setRosterTab('RESPONSES')}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', borderRadius: '6px 6px 0 0', fontWeight: 700 }}
+                >
+                  <Table size={14} />
+                  <span>Questionnaire Responses Spreadsheet ({currentModalCourse.custom_questions.length} Questions)</span>
+                </button>
+              </div>
+            )}
 
             {/* Stats Summary Strip */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', padding: '0.75rem 1rem', background: '#f8fafc', borderBottom: '1px solid var(--cpet-border)' }}>
@@ -1063,15 +1154,15 @@ export const CoursesManager = () => {
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
-                style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                style={{ fontSize: '0.8rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
                 onClick={handleExportCohortCSV}
               >
                 <Download size={14} />
-                Export Cohort ({modalFilteredStudents.length})
+                <span>{rosterTab === 'RESPONSES' ? 'Export Responses to Excel (CSV)' : `Export Cohort (${modalFilteredStudents.length})`}</span>
               </button>
             </div>
 
-            {/* Students Table */}
+            {/* Students Table or Questionnaire Responses Spreadsheet */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 1rem' }}>
               {modalFilteredStudents.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b' }}>
@@ -1081,7 +1172,96 @@ export const CoursesManager = () => {
                     No enrollments match your selected cohort, fee, or search criteria.
                   </p>
                 </div>
+              ) : rosterTab === 'RESPONSES' && currentModalCourse?.custom_questions?.length > 0 ? (
+                /* Google Forms / Google Sheets Questionnaire Responses Table */
+                <div className="table-responsive">
+                  <table className="cpet-table" style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc' }}>
+                        <th style={{ width: '40px' }}>#</th>
+                        <th>Adm. No</th>
+                        <th>Student Name</th>
+                        <th>Contact</th>
+                        <th>{currentModalCourse?.category === 'MAHALLU' ? 'Study Centre' : 'Batch'}</th>
+                        {(currentModalCourse.custom_questions || []).map((q, qIdx) => (
+                          <th key={q.id || qIdx} style={{ minWidth: '180px', color: 'var(--cpet-primary)', whiteSpace: 'normal' }}>
+                            <span style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', color: '#64748b' }}>
+                              Q{qIdx + 1} • {q.type.replace('_', ' ')}
+                            </span>
+                            <strong>{q.label}</strong>
+                            {q.required && <span style={{ color: '#dc2626', marginLeft: '2px' }}>*</span>}
+                          </th>
+                        ))}
+                        <th>Payment UTR / Ref</th>
+                        <th>Registered Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {modalFilteredStudents.map((enr, idx) => {
+                        return (
+                          <tr key={enr.id || idx}>
+                            <td style={{ color: '#94a3b8' }}>{idx + 1}</td>
+                            <td>
+                              <span className="badge badge-neutral" style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                                {enr.admission_number}
+                              </span>
+                            </td>
+                            <td>
+                              <strong style={{ color: 'var(--cpet-primary)' }}>{enr.student_name}</strong>
+                            </td>
+                            <td>
+                              <a href={`tel:${enr.account_phone}`} style={{ color: '#0284c7', textDecoration: 'none' }}>
+                                +91 {enr.account_phone}
+                              </a>
+                            </td>
+                            <td>
+                              <span style={{ fontSize: '0.78rem' }}>{enr.centre_name || enr.batch_name || 'General'}</span>
+                            </td>
+                            {(currentModalCourse.custom_questions || []).map((q, qIdx) => {
+                              const ans = enr.custom_responses?.[q.id] !== undefined
+                                ? enr.custom_responses[q.id]
+                                : (enr.custom_responses?.[q.label] !== undefined ? enr.custom_responses[q.label] : null);
+
+                              return (
+                                <td key={q.id || qIdx} style={{ whiteSpace: 'normal', minWidth: '180px', maxWidth: '300px' }}>
+                                  {ans === null || ans === undefined || ans === '' ? (
+                                    <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>—</span>
+                                  ) : Array.isArray(ans) ? (
+                                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                      {ans.map((item, i) => (
+                                        <span key={i} className="badge badge-neutral" style={{ fontSize: '0.72rem' }}>
+                                          {item}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span style={{ fontWeight: 600, color: '#334155', lineHeight: 1.35, display: 'block' }}>
+                                      {String(ans)}
+                                    </span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td>
+                              {enr.custom_responses?.['Payment UTR / Ref'] ? (
+                                <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                                  {enr.custom_responses['Payment UTR / Ref']}
+                                </span>
+                              ) : (
+                                <span style={{ color: '#94a3b8' }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ color: '#64748b', fontSize: '0.75rem' }}>
+                              {enr.enrollment_date || 'N/A'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
+                /* Standard Attendance Roster Table */
                 <div className="table-responsive">
                   <table className="cpet-table" style={{ fontSize: '0.82rem' }}>
                     <thead>

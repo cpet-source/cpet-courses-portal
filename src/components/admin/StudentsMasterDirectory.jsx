@@ -134,21 +134,54 @@ export const StudentsMasterDirectory = () => {
       return;
     }
 
-    const headers = [
-      'Admission No',
-      'Student Name',
-      'Phone Number',
-      'Gender',
-      'Date of Birth',
-      'Course Title',
-      'Centre / Venue',
-      'Enrollment Date',
-      'Fee Status',
-      'Amount Paid (INR)',
-      'Classes Attended',
-      'Completion Status',
-      'Custom Intake Answers'
-    ];
+    const selectedCourse = selectedCourseFilter !== 'ALL' ? courses.find(c => c.id === selectedCourseFilter) : null;
+    const customQuestions = selectedCourse?.custom_questions || [];
+
+    const formatCustomResponses = (responses, courseId) => {
+      if (!responses || typeof responses !== 'object') return '';
+      const cObj = courses.find(c => c.id === courseId);
+      return Object.entries(responses)
+        .map(([k, v]) => {
+          const qDef = cObj?.custom_questions?.find(q => q.id === k);
+          const label = qDef ? qDef.label : k;
+          const formattedVal = Array.isArray(v) ? v.join(', ') : String(v ?? '');
+          return `${label}: ${formattedVal}`;
+        })
+        .join(' | ');
+    };
+
+    const headers = customQuestions.length > 0
+      ? [
+          'Admission No',
+          'Student Name',
+          'Phone Number',
+          'Gender',
+          'Date of Birth',
+          'Course Title',
+          'Centre / Venue',
+          'Enrollment Date',
+          'Fee Status',
+          'Amount Paid (INR)',
+          ...customQuestions.map(q => `"${(q.label || 'Question').replace(/"/g, '""')}"`),
+          'Payment UTR / Ref',
+          'Classes Attended',
+          'Completion Status'
+        ]
+      : [
+          'Admission No',
+          'Student Name',
+          'Phone Number',
+          'Gender',
+          'Date of Birth',
+          'Course Title',
+          'Centre / Venue',
+          'Enrollment Date',
+          'Fee Status',
+          'Amount Paid (INR)',
+          'Classes Attended',
+          'Completion Status',
+          'Custom Intake Answers'
+        ];
 
     const rows = filteredEnrollments.map(e => {
       const cleanPhone = (e.account_phone || '').trim().replace(/\D/g, '').slice(-10);
@@ -160,20 +193,47 @@ export const StudentsMasterDirectory = () => {
       const g = e.gender || member?.gender || '';
       const dob = e.date_of_birth || member?.date_of_birth || '';
 
+      if (customQuestions.length > 0) {
+        const qAnswers = customQuestions.map(q => {
+          const val = e.custom_responses?.[q.id] !== undefined
+            ? e.custom_responses[q.id]
+            : (e.custom_responses?.[q.label] !== undefined ? e.custom_responses[q.label] : '');
+          return `"${String(val || '').replace(/"/g, '""')}"`;
+        });
+        const utrVal = e.custom_responses?.['Payment UTR / Ref'] || '';
+
+        return [
+          `"${e.admission_number || ''}"`,
+          `"${(e.student_name || '').replace(/"/g, '""')}"`,
+          `"${e.account_phone || ''}"`,
+          `"${g}"`,
+          `"${dob}"`,
+          `"${(e.course_title || '').replace(/"/g, '""')}"`,
+          `"${(e.centre_name || 'N/A').replace(/"/g, '""')}"`,
+          `"${e.enrollment_date || ''}"`,
+          `"${e.fee_status || ''}"`,
+          e.amount_paid || 0,
+          ...qAnswers,
+          `"${String(utrVal).replace(/"/g, '""')}"`,
+          e.classes_attended || 0,
+          `"${e.completion_status || ''}"`
+        ];
+      }
+
       return [
-        `"${e.admission_number}"`,
-        `"${e.student_name}"`,
-        `"${e.account_phone}"`,
+        `"${e.admission_number || ''}"`,
+        `"${(e.student_name || '').replace(/"/g, '""')}"`,
+        `"${e.account_phone || ''}"`,
         `"${g}"`,
         `"${dob}"`,
-        `"${e.course_title}"`,
-        `"${e.centre_name || 'N/A'}"`,
-        `"${e.enrollment_date}"`,
-        `"${e.fee_status}"`,
-        e.amount_paid,
+        `"${(e.course_title || '').replace(/"/g, '""')}"`,
+        `"${(e.centre_name || 'N/A').replace(/"/g, '""')}"`,
+        `"${e.enrollment_date || ''}"`,
+        `"${e.fee_status || ''}"`,
+        e.amount_paid || 0,
         e.classes_attended || 0,
-        `"${e.completion_status}"`,
-        `"${JSON.stringify(e.custom_responses || {}).replace(/"/g, '""')}"`
+        `"${e.completion_status || ''}"`,
+        `"${formatCustomResponses(e.custom_responses, e.course_id).replace(/"/g, '""')}"`
       ];
     });
 
@@ -182,13 +242,14 @@ export const StudentsMasterDirectory = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `CPET_Students_Master_${new Date().toISOString().split('T')[0]}.csv`);
+    const courseSlug = selectedCourse ? `_${(selectedCourse.course_code || selectedCourse.title || 'course').toLowerCase().replace(/\s+/g, '_')}` : '';
+    link.setAttribute('download', `CPET_Students${courseSlug}_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    showToast('Exported student directory to Excel (CSV)!');
+    showToast(`Exported ${filteredEnrollments.length} records to Excel (CSV)!`);
   };
 
   return (
@@ -539,11 +600,16 @@ export const StudentsMasterDirectory = () => {
                         <div style={{ marginTop: '0.5rem', background: '#f8fafc', padding: '0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>
                           <span style={{ fontWeight: 700, color: 'var(--cpet-accent)' }}>Intake Form Responses:</span>
                           <ul style={{ paddingLeft: '1.2rem', marginTop: '0.2rem' }}>
-                            {Object.entries(enrItem.custom_responses).map(([k, v]) => (
-                              <li key={k}>
-                                <strong>{k}:</strong> {Array.isArray(v) ? v.join(', ') : String(v)}
-                              </li>
-                            ))}
+                            {Object.entries(enrItem.custom_responses).map(([k, v]) => {
+                              const cObj = courses.find(c => c.id === enrItem.course_id || c.title === enrItem.course_title);
+                              const qDef = cObj?.custom_questions?.find(q => q.id === k);
+                              const label = qDef ? qDef.label : k;
+                              return (
+                                <li key={k}>
+                                  <strong>{label}:</strong> {Array.isArray(v) ? v.join(', ') : String(v)}
+                                </li>
+                              );
+                            })}
                           </ul>
                         </div>
                       )}
