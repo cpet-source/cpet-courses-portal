@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { CourseCatalog } from './CourseCatalog';
 import { CourseRegistrationForm } from './CourseRegistrationForm';
-import { Search, UserCheck, GraduationCap, Award, BookOpen, CheckCircle, Clock, Calendar, ArrowRight, ShieldCheck, Plus, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Search, UserCheck, GraduationCap, Award, BookOpen, CheckCircle, Clock, Calendar, ArrowRight, ShieldCheck, Plus, AlertCircle, ArrowLeft, Copy, Check } from 'lucide-react';
 
 export const StudentHub = () => {
   const { lookupStudentByPhone, enrollments, courses, centres, showToast } = useApp();
@@ -10,6 +10,10 @@ export const StudentHub = () => {
   const [accountData, setAccountData] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+
+  // Registration Success state
+  const [completedEnrollment, setCompletedEnrollment] = useState(null);
+  const [copiedAdm, setCopiedAdm] = useState(false);
 
   // Deep link detection state
   const [registeringCourse, setRegisteringCourse] = useState(null);
@@ -62,6 +66,7 @@ export const StudentHub = () => {
 
   const handleSelectCourse = (course) => {
     setRegisteringCourse(course);
+    setCompletedEnrollment(null);
     setViewMode('register');
     setDeepLinkNotFound(false);
     if (window.history.pushState) {
@@ -73,16 +78,19 @@ export const StudentHub = () => {
 
   const handleBackToCatalog = () => {
     setRegisteringCourse(null);
+    setCompletedEnrollment(null);
     setViewMode('catalog');
     setDeepLinkNotFound(false);
     if (window.history.replaceState) {
       window.history.replaceState({}, '', window.location.pathname);
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSwitchToLookup = () => {
     setViewMode('lookup');
     setRegisteringCourse(null);
+    setCompletedEnrollment(null);
     setDeepLinkNotFound(false);
     if (window.history.replaceState) {
       window.history.replaceState({}, '', window.location.pathname);
@@ -116,7 +124,7 @@ export const StudentHub = () => {
       {/* Sub Navigation */}
       <div className="cpet-tabs" style={{ marginBottom: '1.5rem' }}>
         <button
-          className={`tab-btn ${viewMode === 'catalog' || viewMode === 'register' ? 'active' : ''}`}
+          className={`tab-btn ${viewMode === 'catalog' || viewMode === 'register' || viewMode === 'success' ? 'active' : ''}`}
           onClick={handleBackToCatalog}
         >
           <BookOpen size={16} />
@@ -138,6 +146,171 @@ export const StudentHub = () => {
         </div>
       )}
 
+      {/* Dedicated Registration Success Screen */}
+      {viewMode === 'success' && completedEnrollment && (
+        <div className="cpet-card" style={{ maxWidth: '640px', margin: '0 auto 2rem', textAlign: 'center', padding: '2.5rem 1.75rem', borderTop: '5px solid #16a34a', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)' }}>
+          {/* Celebratory Icon */}
+          <div style={{
+            width: '80px',
+            height: '80px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 1.25rem',
+            color: '#16a34a',
+            boxShadow: '0 0 0 10px rgba(34, 197, 94, 0.15)'
+          }}>
+            <CheckCircle size={46} strokeWidth={2.4} />
+          </div>
+
+          <span className="badge badge-success" style={{ fontSize: '0.85rem', padding: '5px 14px', marginBottom: '0.6rem', fontWeight: 700 }}>
+            Alhamdulillah • Seat Confirmed
+          </span>
+
+          <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--cpet-primary)', margin: '0.4rem 0 0.5rem' }}>
+            Your Registration is Complete!
+          </h2>
+
+          <p style={{ fontSize: '0.95rem', color: '#475569', maxWidth: '480px', margin: '0 auto 1.5rem', lineHeight: 1.55 }}>
+            You have successfully registered for <strong>{completedEnrollment.course_title}</strong>. Your institutional record is now active in the CPET portal.
+          </p>
+
+          {/* Admission Slip Card */}
+          <div style={{
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.25rem 1.5rem',
+            textAlign: 'left',
+            marginBottom: '1.5rem',
+            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
+          }}>
+            {/* Monospace Admission Number Highlight */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
+              paddingBottom: '0.85rem',
+              borderBottom: '1px dashed #cbd5e1',
+              marginBottom: '0.85rem'
+            }}>
+              <div>
+                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: 700, display: 'block' }}>
+                  Official Admission Number
+                </span>
+                <span style={{ fontSize: '1.45rem', fontFamily: 'monospace', fontWeight: 800, color: 'var(--cpet-primary)' }}>
+                  {completedEnrollment.admission_number}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(completedEnrollment.admission_number);
+                  setCopiedAdm(true);
+                  showToast('Admission number copied to clipboard!');
+                  setTimeout(() => setCopiedAdm(false), 2500);
+                }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', fontWeight: 600 }}
+              >
+                {copiedAdm ? <Check size={14} color="#16a34a" /> : <Copy size={14} />}
+                <span>{copiedAdm ? 'Copied!' : 'Copy Adm. No'}</span>
+              </button>
+            </div>
+
+            {/* Student & Course Details */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', fontSize: '0.85rem' }}>
+              <div>
+                <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Student Name:</span>
+                <strong style={{ color: 'var(--cpet-primary)', fontSize: '0.95rem' }}>{completedEnrollment.student_name}</strong>
+              </div>
+
+              <div>
+                <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Registered Mobile:</span>
+                <strong style={{ color: '#334155' }}>+91 {completedEnrollment.account_phone}</strong>
+              </div>
+
+              <div>
+                <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Course / Program:</span>
+                <strong style={{ color: '#334155' }}>{completedEnrollment.course_title}</strong>
+              </div>
+
+              <div>
+                <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Centre / Venue:</span>
+                <strong style={{ color: '#334155' }}>{completedEnrollment.centre_name || 'Central Campus / Online'}</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Screenshot / Note Helper */}
+          <div style={{
+            background: '#fffbeb',
+            border: '1px solid #fef3c7',
+            color: '#92400e',
+            borderRadius: 'var(--radius-md)',
+            padding: '0.75rem 1rem',
+            fontSize: '0.82rem',
+            lineHeight: 1.5,
+            marginBottom: '1.75rem',
+            textAlign: 'center'
+          }}>
+            📸 <strong>Please Note:</strong> Take a screenshot or note down your <strong>Admission Number ({completedEnrollment.admission_number})</strong> for future communication and attendance.
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {/* Primary Button: Explore Other Programs */}
+            <button
+              type="button"
+              className="btn btn-primary btn-lg"
+              onClick={handleBackToCatalog}
+              style={{
+                width: '100%',
+                padding: '0.95rem 1.5rem',
+                fontSize: '1.05rem',
+                fontWeight: 800,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)'
+              }}
+            >
+              <BookOpen size={20} />
+              <span>Explore Other Programs</span>
+            </button>
+
+            {/* Secondary Text Link to Track Progress */}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setPhoneSearch(completedEnrollment.account_phone);
+                setViewMode('lookup');
+                handleLookup(null, completedEnrollment.account_phone);
+              }}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+            >
+              <Search size={15} />
+              <span>Track Course Status & Results</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {viewMode === 'catalog' && (
         <CourseCatalog
           onSelectCourse={handleSelectCourse}
@@ -150,10 +323,13 @@ export const StudentHub = () => {
             course={registeringCourse}
             onBack={handleBackToCatalog}
             onComplete={(newEnrollment) => {
-              setPhoneSearch(newEnrollment.account_phone);
-              setViewMode('lookup');
-              handleLookup(null, newEnrollment.account_phone);
-              showToast(`Registration confirmed! Admission No: ${newEnrollment.admission_number}`);
+              setCompletedEnrollment(newEnrollment);
+              setViewMode('success');
+              if (window.history.replaceState) {
+                window.history.replaceState({}, '', window.location.pathname);
+              }
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              showToast(`Alhamdulillah! Registration complete for ${newEnrollment.student_name}`);
             }}
           />
         ) : (
