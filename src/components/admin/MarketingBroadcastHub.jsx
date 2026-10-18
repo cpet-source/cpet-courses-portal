@@ -76,11 +76,11 @@ export const MarketingBroadcastHub = () => {
           parsed.accessToken = defaultPermanentToken;
           updated = true;
         }
-        if (!parsed.phoneNumberId || parsed.phoneNumberId !== defaultPhoneNumberId) {
+        if (!parsed.phoneNumberId) {
           parsed.phoneNumberId = defaultPhoneNumberId;
           updated = true;
         }
-        if (!parsed.wabaId || parsed.wabaId !== defaultWabaId) {
+        if (!parsed.wabaId) {
           parsed.wabaId = defaultWabaId;
           updated = true;
         }
@@ -95,7 +95,7 @@ export const MarketingBroadcastHub = () => {
       wabaId: defaultWabaId,
       accessToken: defaultPermanentToken,
       templateName: 'cpet_course_admission',
-      templateLanguage: 'en',
+      templateLanguage: 'en_US',
       costPerMessage: 0.80, // Meta marketing conversation rate in India (approx ₹0.80)
       verifiedBusinessName: 'CPET - Darul Huda Islamic University'
     };
@@ -107,6 +107,38 @@ export const MarketingBroadcastHub = () => {
       localStorage.setItem(META_CONFIG_STORAGE_KEY, JSON.stringify(newConfig));
       showToast('Meta WhatsApp Cloud API settings saved successfully!');
     } catch (e) {}
+  };
+
+  // Live Meta Template Inspector State
+  const [isFetchingTemplates, setIsFetchingTemplates] = useState(false);
+  const [metaTemplatesList, setMetaTemplatesList] = useState(null);
+  const [metaTemplatesError, setMetaTemplatesError] = useState(null);
+
+  const handleFetchMetaTemplates = async () => {
+    if (!metaConfig.accessToken || !metaConfig.wabaId) {
+      showToast('Please provide WABA ID and Access Token to fetch templates', 'warning');
+      return;
+    }
+    setIsFetchingTemplates(true);
+    setMetaTemplatesError(null);
+    try {
+      const res = await fetch(`https://graph.facebook.com/v21.0/${metaConfig.wabaId.trim()}/message_templates?limit=100&fields=name,status,language,category,components`, {
+        headers: {
+          'Authorization': `Bearer ${metaConfig.accessToken.trim()}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error?.message || 'Failed to fetch templates from Meta');
+      }
+      setMetaTemplatesList(data.data || []);
+      showToast(`Found ${(data.data || []).length} templates in WABA ${metaConfig.wabaId}!`);
+    } catch (err) {
+      setMetaTemplatesError(err.message);
+      showToast(err.message, 'danger');
+    } finally {
+      setIsFetchingTemplates(false);
+    }
   };
 
   // 5. Test Message Dispatcher State
@@ -429,15 +461,72 @@ _Darul Huda Islamic University, Chemmad_`;
         return { success: true, messageId: directData?.messages?.[0]?.id || `wamid_${Date.now()}` };
       };
 
-      // Candidate language codes to test (handles regional en_US vs en differences)
-      const primaryLang = isHelloWorld ? 'en_US' : (metaConfig.templateLanguage || 'en');
+      // Candidate language codes to test (handles regional en_US, en, en_GB differences)
+      const primaryLang = isHelloWorld ? 'en_US' : (metaConfig.templateLanguage?.trim() || 'en_US');
       const candidateLangs = [primaryLang];
-      if (primaryLang === 'en_US') candidateLangs.push('en');
-      else if (primaryLang === 'en') candidateLangs.push('en_US');
+      ['en_US', 'en', 'en_GB'].forEach(code => {
+        if (!candidateLangs.includes(code)) candidateLangs.push(code);
+      });
 
       let lastError = null;
 
       for (const langCode of candidateLangs) {
+        // Check if we have template definition from Meta to match exact components
+        const matchedTpl = metaTemplatesList?.find(t => t.name === activeTemplate && t.language === langCode)
+          || metaTemplatesList?.find(t => t.name === activeTemplate);
+
+        let components = [];
+        if (!isHelloWorld) {
+          const hasImageHeaderInMeta = matchedTpl
+            ? matchedTpl.components?.some(c => c.type === 'HEADER' && c.format === 'IMAGE')
+            : (hasHttpLink || isBase64);
+
+          if (hasImageHeaderInMeta) {
+            if (hasHttpLink) {
+              components.push({
+                type: 'header',
+                parameters: [{ type: 'image', image: { link: activeCourse.poster_url } }]
+              });
+            } else if (isBase64) {
+              components.push({
+                type: 'header',
+                parameters: [{ type: 'image', image: { base64: activeCourse.poster_url } }]
+              });
+            }
+          }
+
+          // Body parameters: check how many params template expects
+          const bodyComp = matchedTpl?.components?.find(c => c.type === 'BODY');
+          const bodyParamMatches = bodyComp?.text ? bodyComp.text.match(/\{\{\d+\}\}/g) : null;
+          const paramCount = bodyParamMatches ? bodyParamMatches.length : 4;
+
+          const allPossibleBodyParams = [
+            { type: 'text', text: studentName || 'Candidate' },
+            { type: 'text', text: activeCourse?.title || 'Program' },
+            { type: 'text', text: activeCourse?.start_date || 'Upcoming' },
+            { type: 'text', text: activeCourse?.standard_fee > 0 ? `₹${activeCourse.standard_fee}` : 'FREE' }
+          ];
+
+          components.push({
+            type: 'body',
+            parameters: allPossibleBodyParams.slice(0, Math.max(1, paramCount))
+          });
+
+          // Button component: only if template has URL button
+          const hasUrlButton = matchedTpl
+            ? matchedTpl.components?.some(c => c.type === 'BUTTONS' && c.buttons?.some(b => b.type === 'URL'))
+            : true;
+
+          if (hasUrlButton) {
+            components.push({
+              type: 'button',
+              sub_type: 'url',
+              index: '0',
+              parameters: [{ type: 'text', text: activeCourse?.slug || activeCourse?.id || '' }]
+            });
+          }
+        }
+
         const payload = {
           messaging_product: 'whatsapp',
           to: `91${cleanPhone}`,
@@ -447,31 +536,8 @@ _Darul Huda Islamic University, Chemmad_`;
             language: { code: langCode }
           } : {
             name: activeTemplate,
-            language: { code: langCode },
-            components: [
-              ...(hasHttpLink ? [{
-                type: 'header',
-                parameters: [{ type: 'image', image: { link: activeCourse.poster_url } }]
-              }] : (isBase64 ? [{
-                type: 'header',
-                parameters: [{ type: 'image', image: { base64: activeCourse.poster_url } }]
-              }] : [])),
-              {
-                type: 'body',
-                parameters: [
-                  { type: 'text', text: studentName || 'Candidate' },
-                  { type: 'text', text: activeCourse?.title || 'Program' },
-                  { type: 'text', text: activeCourse?.start_date || 'Upcoming' },
-                  { type: 'text', text: activeCourse?.standard_fee > 0 ? `₹${activeCourse.standard_fee}` : 'FREE' }
-                ]
-              },
-              {
-                type: 'button',
-                sub_type: 'url',
-                index: '0',
-                parameters: [{ type: 'text', text: activeCourse?.slug || activeCourse?.id || '' }]
-              }
-            ]
+            language: { code: matchedTpl?.language || langCode },
+            components
           }
         };
 
@@ -479,8 +545,8 @@ _Darul Huda Islamic University, Chemmad_`;
           return await dispatchPayload(payload);
         } catch (err) {
           lastError = err;
-          // Only retry with alternate language code if it was a translation/language error
-          if (!err.message || (!err.message.includes('132001') && !err.message.includes('translation'))) {
+          // Only retry with alternate language code if it was a translation/language error or param mismatch
+          if (!err.message || (!err.message.includes('132001') && !err.message.includes('translation') && !err.message.includes('132000'))) {
             throw err;
           }
         }
@@ -489,10 +555,10 @@ _Darul Huda Islamic University, Chemmad_`;
       if (lastError) {
         if (lastError.message && (lastError.message.includes('132001') || lastError.message.includes('translation'))) {
           throw new Error(
-            `Template "${activeTemplate}" was not found in your Meta WhatsApp Account. ` +
+            `Template "${activeTemplate}" was not found in WhatsApp Business Account (WABA ID: ${metaConfig.wabaId}). ` +
             (isHelloWorld 
               ? 'Please check the API Setup screen in Meta Developers to verify your test template.' 
-              : `Have you created and approved "${activeTemplate}" in Meta WhatsApp Manager? (Step 6)`)
+              : `Meta returned error 132001. Please use the "Sync & Inspect Templates from Meta WABA" button in Settings below to verify your template name and WABA ID.`)
           );
         }
         throw lastError;
@@ -1363,6 +1429,95 @@ _Darul Huda Islamic University, Chemmad_`;
               <button type="submit" className="btn btn-primary btn-block" style={{ marginTop: '0.5rem' }}>
                 <Check size={16} /> Save Meta API Settings
               </button>
+
+              {/* Sync and Inspect Templates Button */}
+              <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--cpet-border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+                  <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: '0.88rem', color: 'var(--cpet-primary)' }}>
+                    Meta WABA Template Diagnostic:
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleFetchMetaTemplates}
+                    disabled={isFetchingTemplates}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem' }}
+                  >
+                    <RefreshCw size={13} style={{ animation: isFetchingTemplates ? 'spin 1s linear infinite' : 'none' }} />
+                    <span>{isFetchingTemplates ? 'Fetching...' : 'Sync & Inspect Templates'}</span>
+                  </button>
+                </div>
+
+                <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 0.75rem' }}>
+                  Click to query Meta's servers directly for all templates created under WABA ID <code>{metaConfig.wabaId}</code>.
+                </p>
+
+                {metaTemplatesError && (
+                  <div style={{ padding: '0.75rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', fontSize: '0.8rem', color: '#b91c1c', marginBottom: '0.75rem' }}>
+                    {metaTemplatesError}
+                  </div>
+                )}
+
+                {metaTemplatesList && (
+                  <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}>
+                    <div style={{ fontWeight: 700, color: 'var(--cpet-primary)', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Templates Found in WABA ({metaTemplatesList.length}):</span>
+                      <span className="badge badge-neutral" style={{ fontSize: '0.7rem' }}>WABA: {metaConfig.wabaId}</span>
+                    </div>
+
+                    {metaTemplatesList.length === 0 ? (
+                      <div style={{ color: '#b91c1c', lineHeight: 1.45 }}>
+                        <strong>No templates found in this WABA ID.</strong>
+                        <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#475569' }}>
+                          If you created <code>cpet_course_admission</code> in WhatsApp Manager, look at the top-left account selector dropdown in Meta WhatsApp Manager (or check the browser URL <code>waba_id=...</code>). You may have created it under a different WABA ID. Enter that WABA ID above and click Save.
+                        </p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '220px', overflowY: 'auto' }}>
+                        {metaTemplatesList.map(t => (
+                          <div
+                            key={t.id || t.name}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              background: 'white',
+                              padding: '0.45rem 0.65rem',
+                              borderRadius: '4px',
+                              border: t.name === metaConfig.templateName ? '1.5px solid #2563eb' : '1px solid #e2e8f0'
+                            }}
+                          >
+                            <div>
+                              <strong style={{ color: '#1e293b' }}>{t.name}</strong>
+                              <span style={{ marginLeft: '6px', fontSize: '0.72rem', color: '#64748b' }}>({t.language}) • {t.category}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span className={`badge ${t.status === 'APPROVED' ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.7rem' }}>
+                                {t.status}
+                              </span>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+                                onClick={() => {
+                                  setMetaConfig(prev => ({
+                                    ...prev,
+                                    templateName: t.name,
+                                    templateLanguage: t.language
+                                  }));
+                                  showToast(`Selected "${t.name}" (${t.language}) as active template!`);
+                                }}
+                              >
+                                Use This
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </form>
           </div>
 
