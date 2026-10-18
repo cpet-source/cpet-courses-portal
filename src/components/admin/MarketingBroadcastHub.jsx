@@ -553,6 +553,12 @@ _Darul Huda Islamic University, Chemmad_`;
       }
 
       if (lastError) {
+        if (lastError.message && (lastError.message.includes('131058') || lastError.message.includes('Public Test Numbers'))) {
+          throw new Error(
+            `Meta Cloud API does not permit sending "hello_world" from live verified phone numbers (+91 89771 59161). ` +
+            `Please test with your custom approved template "${metaConfig.templateName || 'cpet_course_admission'}".`
+          );
+        }
         if (lastError.message && (lastError.message.includes('132001') || lastError.message.includes('translation'))) {
           throw new Error(
             `Template "${activeTemplate}" was not found in WhatsApp Business Account (WABA ID: ${metaConfig.wabaId}). ` +
