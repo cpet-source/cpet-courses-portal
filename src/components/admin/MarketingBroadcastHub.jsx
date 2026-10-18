@@ -518,11 +518,20 @@ _Darul Huda Islamic University, Chemmad_`;
             : true;
 
           if (hasUrlButton) {
+            const buttonUrlInTemplate = matchedTpl?.components
+              ?.find(c => c.type === 'BUTTONS')
+              ?.buttons?.[0]?.url || '';
+
+            let btnParam = activeCourse?.slug || activeCourse?.id || 'portal';
+            if (buttonUrlInTemplate.includes('?course=') && !buttonUrlInTemplate.endsWith('?course={{1}}')) {
+              btnParam = '&ref=whatsapp';
+            }
+
             components.push({
               type: 'button',
               sub_type: 'url',
               index: '0',
-              parameters: [{ type: 'text', text: activeCourse?.slug || activeCourse?.id || '' }]
+              parameters: [{ type: 'text', text: btnParam }]
             });
           }
         }
