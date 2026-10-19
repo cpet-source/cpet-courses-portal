@@ -649,9 +649,12 @@ _Darul Huda Islamic University, Chemmad_`;
               ?.find(c => c.type === 'BUTTONS')
               ?.buttons?.[0]?.url || '';
 
-            let btnParam = activeCourse?.slug || activeCourse?.id || 'portal';
+            const courseTarget = activeCourse?.slug || activeCourse?.course_code?.toLowerCase() || activeCourse?.id || 'portal';
+            let btnParam = courseTarget;
+
+            // If the template in Meta already hardcoded "?course=...", pass "&selected=" so the portal opens the correct course
             if (buttonUrlInTemplate.includes('?course=') && !buttonUrlInTemplate.endsWith('?course={{1}}')) {
-              btnParam = '&ref=whatsapp';
+              btnParam = `&selected=${courseTarget}`;
             }
 
             components.push({

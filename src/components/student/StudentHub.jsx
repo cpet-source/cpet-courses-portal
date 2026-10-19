@@ -42,7 +42,7 @@ export const StudentHub = () => {
     }
 
     const params = new URLSearchParams(window.location.search);
-    const slugOrId = params.get('course') || params.get('slug') || params.get('id') || params.get('c');
+    const slugOrId = params.get('selected') || params.get('active_course') || params.get('course') || params.get('slug') || params.get('id') || params.get('c');
 
     if (slugOrId) {
       const cleanTarget = slugOrId.toLowerCase().trim();
