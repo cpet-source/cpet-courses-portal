@@ -503,7 +503,7 @@ _Darul Huda Islamic University, Chemmad_`;
           const allPossibleBodyParams = [
             { type: 'text', text: studentName || 'Candidate' },
             { type: 'text', text: activeCourse?.title || 'Program' },
-            { type: 'text', text: activeCourse?.start_date || 'Upcoming' },
+            { type: 'text', text: activeCourse?.registration_deadline ? `Apply by ${activeCourse.registration_deadline}` : (activeCourse?.start_date || 'Upcoming Batch') },
             { type: 'text', text: activeCourse?.standard_fee > 0 ? `₹${activeCourse.standard_fee}` : 'FREE' }
           ];
 
@@ -968,41 +968,94 @@ _Darul Huda Islamic University, Chemmad_`;
                 </div>
               )}
 
-              {/* Message Composer */}
+              {/* Live Meta Cloud API Message Preview */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                  <label className="form-label" style={{ margin: 0 }}>WhatsApp Promotional Template:</label>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <button
-                      type="button"
-                      className={`btn btn-sm ${selectedTemplateKey === 'DEFAULT' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem' }}
-                      onClick={() => { setSelectedTemplateKey('DEFAULT'); setCustomMessageText(''); }}
-                    >
-                      English
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn btn-sm ${selectedTemplateKey === 'MALAYALAM' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem' }}
-                      onClick={() => { setSelectedTemplateKey('MALAYALAM'); setCustomMessageText(''); }}
-                    >
-                      മലയാളം
-                    </button>
-                  </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '4px' }}>
+                  <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: '0.88rem', color: 'var(--cpet-primary)' }}>
+                    Meta WhatsApp Message Preview:
+                  </label>
+                  <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>
+                    Template: {metaConfig.templateName || 'cpet_course_admission'}
+                  </span>
                 </div>
 
-                <textarea
-                  className="form-input"
-                  rows={7}
-                  style={{ fontSize: '0.82rem', fontFamily: 'monospace', lineHeight: 1.45, resize: 'vertical' }}
-                  value={activeMessageTemplate}
-                  onChange={e => setCustomMessageText(e.target.value)}
-                  placeholder="Type promotional message..."
-                />
-                <span className="form-helper">
-                  Use <code>{'{name}'}</code> to automatically insert candidate's name in each WhatsApp message.
-                </span>
+                {/* WhatsApp Chat Bubble Mockup */}
+                <div style={{
+                  background: '#efeae2',
+                  padding: '0.85rem',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid #d1d5db',
+                  maxWidth: '100%',
+                  backgroundImage: 'radial-gradient(#d5cbb8 1px, transparent 1px)',
+                  backgroundSize: '16px 16px'
+                }}>
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '8px',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
+                    overflow: 'hidden',
+                    maxWidth: '420px',
+                    margin: '0 auto'
+                  }}>
+                    {/* Header Image Poster */}
+                    {activeCourse?.poster_url ? (
+                      <div style={{ width: '100%', height: '160px', overflow: 'hidden', background: '#f1f5f9' }}>
+                        <img
+                          src={activeCourse.poster_url}
+                          alt={activeCourse.title}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{ background: '#e2e8f0', padding: '1.25rem', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>
+                        🖼️ Course Flyer Poster Banner
+                      </div>
+                    )}
+
+                    {/* Template Body Text */}
+                    <div style={{ padding: '0.85rem 1rem 0.5rem', fontSize: '0.84rem', color: '#111827', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                      <p style={{ margin: '0 0 0.5rem' }}>Assalamu Alaikum <strong>{'{Candidate Name}'}</strong>,</p>
+                      <p style={{ margin: '0 0 0.5rem' }}>
+                        Admissions are now open for the CPET course: <strong>{activeCourse?.title || 'Program'}</strong>.
+                        <br />
+                        Classes start on: <strong>{activeCourse?.registration_deadline ? `Apply by ${activeCourse.registration_deadline}` : (activeCourse?.start_date || 'Upcoming Batch')}</strong>.
+                        <br />
+                        Course Fee: <strong>{activeCourse?.standard_fee > 0 ? `₹${activeCourse.standard_fee}` : 'FREE'}</strong>.
+                      </p>
+                      <p style={{ margin: '0 0 0.5rem', color: '#374151' }}>
+                        Click the button below to view the syllabus and complete your registration:
+                      </p>
+                      <div style={{ textAlign: 'right', fontSize: '0.68rem', color: '#9ca3af', marginTop: '4px' }}>
+                        {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ✓✓
+                      </div>
+                    </div>
+
+                    {/* Dynamic URL Button */}
+                    <div style={{ borderTop: '1px solid #f3f4f6', padding: '0.6rem 0.85rem', textAlign: 'center', background: '#fafafa' }}>
+                      <a
+                        href={registrationLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          color: '#0284c7',
+                          fontWeight: 700,
+                          fontSize: '0.85rem',
+                          textDecoration: 'none'
+                        }}
+                      >
+                        <ExternalLink size={14} /> Visit website
+                      </a>
+                    </div>
+                  </div>
+
+                  <p style={{ margin: '0.65rem 0 0', fontSize: '0.72rem', color: '#64748b', textAlign: 'center' }}>
+                    🔒 Official Meta Cloud API format. Dynamic variables are injected automatically for each candidate.
+                  </p>
+                </div>
               </div>
             </div>
 
