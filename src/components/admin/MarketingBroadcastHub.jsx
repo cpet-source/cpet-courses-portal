@@ -38,6 +38,7 @@ import {
 
 const META_CONFIG_STORAGE_KEY = 'cpet_meta_whatsapp_config';
 const CAMPAIGN_HISTORY_STORAGE_KEY = 'cpet_marketing_campaigns_log';
+const META_TEMPLATES_STORAGE_KEY = 'cpet_meta_whatsapp_templates_cache';
 
 export const MarketingBroadcastHub = () => {
   const { courses, students, enrollments, centres, showToast } = useApp();
@@ -101,22 +102,30 @@ export const MarketingBroadcastHub = () => {
     };
   });
 
-  const saveMetaConfig = (newConfig) => {
+  const saveMetaConfig = (newConfig, toastMsg = 'Meta WhatsApp Cloud API settings saved successfully!') => {
     setMetaConfig(newConfig);
     try {
       localStorage.setItem(META_CONFIG_STORAGE_KEY, JSON.stringify(newConfig));
-      showToast('Meta WhatsApp Cloud API settings saved successfully!');
+      if (toastMsg) showToast(toastMsg);
     } catch (e) {}
   };
 
-  // Live Meta Template Inspector State
+  // Live Meta Template Inspector & Selector State
   const [isFetchingTemplates, setIsFetchingTemplates] = useState(false);
-  const [metaTemplatesList, setMetaTemplatesList] = useState(null);
+  const [metaTemplatesList, setMetaTemplatesList] = useState(() => {
+    try {
+      const stored = localStorage.getItem(META_TEMPLATES_STORAGE_KEY);
+      if (stored) return JSON.parse(stored);
+    } catch (e) {}
+    return null;
+  });
   const [metaTemplatesError, setMetaTemplatesError] = useState(null);
+  const [showCustomTemplateInput, setShowCustomTemplateInput] = useState(false);
+  const [customTemplateNameInput, setCustomTemplateNameInput] = useState('');
 
-  const handleFetchMetaTemplates = async () => {
+  const handleFetchMetaTemplates = async (silent = false) => {
     if (!metaConfig.accessToken || !metaConfig.wabaId) {
-      showToast('Please provide WABA ID and Access Token to fetch templates', 'warning');
+      if (!silent) showToast('Please provide WABA ID and Access Token to fetch templates', 'warning');
       return;
     }
     setIsFetchingTemplates(true);
@@ -131,15 +140,30 @@ export const MarketingBroadcastHub = () => {
       if (!res.ok) {
         throw new Error(data?.error?.message || 'Failed to fetch templates from Meta');
       }
-      setMetaTemplatesList(data.data || []);
-      showToast(`Found ${(data.data || []).length} templates in WABA ${metaConfig.wabaId}!`);
+      const fetchedTemplates = data.data || [];
+      setMetaTemplatesList(fetchedTemplates);
+      try {
+        localStorage.setItem(META_TEMPLATES_STORAGE_KEY, JSON.stringify(fetchedTemplates));
+      } catch (e) {}
+      if (!silent) {
+        showToast(`Found ${fetchedTemplates.length} templates in WABA ${metaConfig.wabaId}!`);
+      }
     } catch (err) {
       setMetaTemplatesError(err.message);
-      showToast(err.message, 'danger');
+      if (!silent) {
+        showToast(err.message, 'danger');
+      }
     } finally {
       setIsFetchingTemplates(false);
     }
   };
+
+  // Automatically sync approved templates in background on mount if credentials exist
+  useEffect(() => {
+    if (!metaTemplatesList && metaConfig.accessToken && metaConfig.wabaId) {
+      handleFetchMetaTemplates(true);
+    }
+  }, []);
 
   // 5. Test Message Dispatcher State
   const [testPhoneNumber, setTestPhoneNumber] = useState('');
@@ -380,6 +404,109 @@ _Darul Huda Islamic University, Chemmad_`;
   const getPersonalizedMessage = (candidateName) => {
     return activeMessageTemplate.replace(/{name}/g, candidateName || 'Student');
   };
+
+  // Available templates compiled from Meta WABA + default fallback
+  const availableTemplates = useMemo(() => {
+    const list = [];
+    const seen = new Set();
+
+    if (Array.isArray(metaTemplatesList) && metaTemplatesList.length > 0) {
+      metaTemplatesList.forEach(t => {
+        list.push({
+          name: t.name,
+          language: t.language || 'en_US',
+          status: t.status || 'APPROVED',
+          category: t.category || 'MARKETING',
+          components: t.components
+        });
+        seen.add(t.name);
+      });
+    }
+
+    if (!seen.has('cpet_course_admission')) {
+      list.unshift({
+        name: 'cpet_course_admission',
+        language: 'en_US',
+        status: 'APPROVED',
+        category: 'MARKETING'
+      });
+      seen.add('cpet_course_admission');
+    }
+
+    if (metaConfig.templateName && !seen.has(metaConfig.templateName)) {
+      list.push({
+        name: metaConfig.templateName,
+        language: metaConfig.templateLanguage || 'en_US',
+        status: 'CUSTOM',
+        category: 'CUSTOM'
+      });
+    }
+
+    return list;
+  }, [metaTemplatesList, metaConfig.templateName, metaConfig.templateLanguage]);
+
+  const activeTemplateDef = useMemo(() => {
+    const activeName = (metaConfig.templateName || 'cpet_course_admission').trim();
+    if (!metaTemplatesList || !Array.isArray(metaTemplatesList)) return null;
+    return metaTemplatesList.find(t => t.name === activeName && (t.language === metaConfig.templateLanguage || !metaConfig.templateLanguage))
+      || metaTemplatesList.find(t => t.name === activeName)
+      || null;
+  }, [metaTemplatesList, metaConfig.templateName, metaConfig.templateLanguage]);
+
+  const { shouldShowHeaderImage, renderedPreviewBodyText, previewButtons } = useMemo(() => {
+    const headerComp = activeTemplateDef?.components?.find(c => c.type === 'HEADER');
+    const bodyComp = activeTemplateDef?.components?.find(c => c.type === 'BODY');
+    const btnComp = activeTemplateDef?.components?.find(c => c.type === 'BUTTONS');
+
+    // Header image: default to true for course admission, or check Meta header format
+    let showImg = true;
+    if (activeTemplateDef) {
+      showImg = headerComp ? headerComp.format === 'IMAGE' : false;
+    }
+
+    // Body text
+    let bodyNode = null;
+    if (bodyComp?.text) {
+      let txt = bodyComp.text;
+      txt = txt.replace(/\{\{1\}\}/g, '{Candidate Name}');
+      txt = txt.replace(/\{\{2\}\}/g, activeCourse?.title || 'Program');
+      txt = txt.replace(/\{\{3\}\}/g, activeCourse?.registration_deadline ? `Apply by ${activeCourse.registration_deadline}` : (activeCourse?.start_date || 'Upcoming Batch'));
+      txt = txt.replace(/\{\{4\}\}/g, activeCourse?.standard_fee > 0 ? `₹${activeCourse.standard_fee}` : 'FREE');
+      bodyNode = <span>{txt}</span>;
+    } else {
+      bodyNode = (
+        <>
+          <p style={{ margin: '0 0 0.5rem' }}>Assalamu Alaikum <strong>{'{Candidate Name}'}</strong>,</p>
+          <p style={{ margin: '0 0 0.5rem' }}>
+            Admissions are now open for the CPET course: <strong>{activeCourse?.title || 'Program'}</strong>.
+            <br />
+            Classes start on: <strong>{activeCourse?.registration_deadline ? `Apply by ${activeCourse.registration_deadline}` : (activeCourse?.start_date || 'Upcoming Batch')}</strong>.
+            <br />
+            Course Fee: <strong>{activeCourse?.standard_fee > 0 ? `₹${activeCourse.standard_fee}` : 'FREE'}</strong>.
+          </p>
+          <p style={{ margin: '0 0 0.5rem', color: '#374151' }}>
+            Click the button below to view the syllabus and complete your registration:
+          </p>
+        </>
+      );
+    }
+
+    // Buttons
+    let btns = [{ text: 'Visit website' }];
+    if (activeTemplateDef) {
+      if (btnComp?.buttons && btnComp.buttons.length > 0) {
+        btns = btnComp.buttons;
+      } else {
+        btns = [];
+      }
+    }
+
+    return {
+      shouldShowHeaderImage: showImg,
+      renderedPreviewBodyText: bodyNode,
+      previewButtons: btns
+    };
+  }, [activeTemplateDef, activeCourse]);
 
   // Helper: Checks if real Meta credentials are provided
   const hasMetaCredentials = Boolean(
@@ -968,6 +1095,111 @@ _Darul Huda Islamic University, Chemmad_`;
                 </div>
               )}
 
+              {/* WhatsApp Broadcast Template Selector */}
+              <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: 'var(--radius-md)', padding: '0.85rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '6px' }}>
+                  <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: '0.85rem', color: 'var(--cpet-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <MessageCircle size={15} color="#2563eb" /> WhatsApp Broadcast Template:
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ fontSize: '0.72rem', padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      onClick={() => handleFetchMetaTemplates(false)}
+                      disabled={isFetchingTemplates}
+                      title="Sync and refresh all approved templates from Meta WABA"
+                    >
+                      <RefreshCw size={11} className={isFetchingTemplates ? 'animate-spin' : ''} />
+                      {isFetchingTemplates ? 'Syncing...' : 'Sync Meta'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+                      onClick={() => setShowCustomTemplateInput(!showCustomTemplateInput)}
+                      title="Enter a custom template name manually"
+                    >
+                      {showCustomTemplateInput ? 'Select from List' : '+ Custom Name'}
+                    </button>
+                  </div>
+                </div>
+
+                {!showCustomTemplateInput ? (
+                  <div>
+                    <select
+                      className="form-select"
+                      style={{ fontWeight: 600, fontSize: '0.88rem', color: '#1e293b', borderColor: '#94a3b8' }}
+                      value={metaConfig.templateName || 'cpet_course_admission'}
+                      onChange={e => {
+                        const selectedName = e.target.value;
+                        const match = availableTemplates.find(t => t.name === selectedName);
+                        saveMetaConfig({
+                          ...metaConfig,
+                          templateName: selectedName,
+                          templateLanguage: match?.language || metaConfig.templateLanguage || 'en_US'
+                        }, `Switched active broadcast template to "${selectedName}"`);
+                      }}
+                    >
+                      {availableTemplates.map(t => (
+                        <option key={`${t.name}_${t.language}`} value={t.name}>
+                          {t.name} ({t.language}) {t.status ? `• [${t.status}]` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ fontSize: '0.85rem', padding: '0.35rem 0.6rem' }}
+                      placeholder="e.g. cpet_admission_malayalam"
+                      value={customTemplateNameInput}
+                      onChange={e => setCustomTemplateNameInput(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', whiteSpace: 'nowrap' }}
+                      onClick={() => {
+                        const trimmed = customTemplateNameInput.trim();
+                        if (!trimmed) {
+                          showToast('Please enter a valid template name', 'warning');
+                          return;
+                        }
+                        saveMetaConfig({
+                          ...metaConfig,
+                          templateName: trimmed
+                        }, `Active template set to "${trimmed}"`);
+                        setShowCustomTemplateInput(false);
+                      }}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem', fontSize: '0.72rem', color: '#64748b' }}>
+                  <span>
+                    Active: <strong style={{ color: '#2563eb' }}>{metaConfig.templateName || 'cpet_course_admission'}</strong>
+                    {activeTemplateDef?.status && (
+                      <span className={`badge ${activeTemplateDef.status === 'APPROVED' ? 'badge-success' : 'badge-warning'}`} style={{ marginLeft: '6px', fontSize: '0.68rem', padding: '1px 6px' }}>
+                        {activeTemplateDef.status}
+                      </span>
+                    )}
+                  </span>
+                  <a
+                    href="https://business.facebook.com/wa/manage/message-templates"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: '#2563eb', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}
+                  >
+                    Manage Templates in Meta <ExternalLink size={10} />
+                  </a>
+                </div>
+              </div>
+
               {/* Live Meta Cloud API Message Preview */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '4px' }}>
@@ -998,58 +1230,55 @@ _Darul Huda Islamic University, Chemmad_`;
                     margin: '0 auto'
                   }}>
                     {/* Header Image Poster */}
-                    {activeCourse?.poster_url ? (
-                      <div style={{ width: '100%', height: '160px', overflow: 'hidden', background: '#f1f5f9' }}>
-                        <img
-                          src={activeCourse.poster_url}
-                          alt={activeCourse.title}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      </div>
-                    ) : (
-                      <div style={{ background: '#e2e8f0', padding: '1.25rem', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>
-                        🖼️ Course Flyer Poster Banner
-                      </div>
+                    {shouldShowHeaderImage && (
+                      activeCourse?.poster_url ? (
+                        <div style={{ width: '100%', height: '160px', overflow: 'hidden', background: '#f1f5f9' }}>
+                          <img
+                            src={activeCourse.poster_url}
+                            alt={activeCourse.title}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </div>
+                      ) : (
+                        <div style={{ background: '#e2e8f0', padding: '1.25rem', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>
+                          🖼️ Course Flyer Poster Banner
+                        </div>
+                      )
                     )}
 
                     {/* Template Body Text */}
                     <div style={{ padding: '0.85rem 1rem 0.5rem', fontSize: '0.84rem', color: '#111827', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                      <p style={{ margin: '0 0 0.5rem' }}>Assalamu Alaikum <strong>{'{Candidate Name}'}</strong>,</p>
-                      <p style={{ margin: '0 0 0.5rem' }}>
-                        Admissions are now open for the CPET course: <strong>{activeCourse?.title || 'Program'}</strong>.
-                        <br />
-                        Classes start on: <strong>{activeCourse?.registration_deadline ? `Apply by ${activeCourse.registration_deadline}` : (activeCourse?.start_date || 'Upcoming Batch')}</strong>.
-                        <br />
-                        Course Fee: <strong>{activeCourse?.standard_fee > 0 ? `₹${activeCourse.standard_fee}` : 'FREE'}</strong>.
-                      </p>
-                      <p style={{ margin: '0 0 0.5rem', color: '#374151' }}>
-                        Click the button below to view the syllabus and complete your registration:
-                      </p>
+                      {renderedPreviewBodyText}
                       <div style={{ textAlign: 'right', fontSize: '0.68rem', color: '#9ca3af', marginTop: '4px' }}>
                         {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ✓✓
                       </div>
                     </div>
 
-                    {/* Dynamic URL Button */}
-                    <div style={{ borderTop: '1px solid #f3f4f6', padding: '0.6rem 0.85rem', textAlign: 'center', background: '#fafafa' }}>
-                      <a
-                        href={registrationLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          color: '#0284c7',
-                          fontWeight: 700,
-                          fontSize: '0.85rem',
-                          textDecoration: 'none'
-                        }}
-                      >
-                        <ExternalLink size={14} /> Visit website
-                      </a>
-                    </div>
+                    {/* Dynamic URL Button or Template Buttons */}
+                    {previewButtons.length > 0 && (
+                      <div style={{ borderTop: '1px solid #f3f4f6', padding: '0.6rem 0.85rem', textAlign: 'center', background: '#fafafa', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {previewButtons.map((btn, bIdx) => (
+                          <a
+                            key={bIdx}
+                            href={registrationLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              color: '#0284c7',
+                              fontWeight: 700,
+                              fontSize: '0.85rem',
+                              textDecoration: 'none'
+                            }}
+                          >
+                            <ExternalLink size={14} /> {btn.text || 'Visit website'}
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <p style={{ margin: '0.65rem 0 0', fontSize: '0.72rem', color: '#64748b', textAlign: 'center' }}>
@@ -1862,10 +2091,14 @@ _Darul Huda Islamic University, Chemmad_`;
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', background: 'white', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', background: 'white', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                       <div>
                         <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>AUDIENCE</span>
                         <strong style={{ fontSize: '1.15rem', color: 'var(--cpet-primary)' }}>{filteredAudience.length}</strong>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>TEMPLATE</span>
+                        <strong style={{ fontSize: '0.82rem', color: '#2563eb', display: 'block', wordBreak: 'break-all' }}>{metaConfig.templateName || 'cpet_course_admission'}</strong>
                       </div>
                       <div>
                         <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>EST. META COST</span>
