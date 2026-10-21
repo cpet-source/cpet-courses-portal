@@ -195,6 +195,18 @@ export const EventCheckInDesk = () => {
     showToast('Volunteer Gate Desk link copied! Share this with your student volunteers via WhatsApp.');
   };
 
+  // Safe time formatter
+  const formatCheckInTime = (iso) => {
+    if (!iso) return 'Arrived';
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return 'Arrived';
+      return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return 'Arrived';
+    }
+  };
+
   // Client-Side Offline Attendance Export to Excel (.xlsx)
   const handleExportAttendance = () => {
     try {
@@ -204,7 +216,7 @@ export const EventCheckInDesk = () => {
         'Student Name': e.student_name || '',
         'Mobile Number': e.account_phone ? `+91 ${e.account_phone}` : '',
         'Check-In Status': ((e.classes_attended || 0) > 0 || e.completion_status === 'COMPLETED') ? 'ATTENDED' : 'YET TO ARRIVE',
-        'Check-In Time': e.gate_checked_in_at ? new Date(e.gate_checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '',
+        'Check-In Time': formatCheckInTime(e.gate_checked_in_at),
         'Companions / Guests': Number(e.gate_companions_count) || 0,
         'Fee Status': e.fee_status || '',
         'Amount Paid (₹)': e.amount_paid || 0,
@@ -580,7 +592,7 @@ export const EventCheckInDesk = () => {
                   {hasCheckedIn ? (
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#166534', marginBottom: '6px' }}>
-                        <div>🕒 {applicant.gate_checked_in_at ? new Date(applicant.gate_checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Arrived'}</div>
+                        <div>🕒 {formatCheckInTime(applicant.gate_checked_in_at)}</div>
                         {Number(applicant.gate_companions_count) > 0 && (
                           <div style={{ color: '#0369a1', fontWeight: 700 }}>+{applicant.gate_companions_count} Guests</div>
                         )}

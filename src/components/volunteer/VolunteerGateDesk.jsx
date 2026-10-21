@@ -54,6 +54,25 @@ export const VolunteerGateDesk = ({ onExit }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState('YET_TO_ARRIVE'); // 'ALL' | 'YET_TO_ARRIVE' | 'CHECKED_IN'
 
+  // Sync selectedCourseId when courses load from cloud/storage
+  useEffect(() => {
+    if (defaultCourse?.id && !selectedCourseId) {
+      setSelectedCourseId(defaultCourse.id);
+    }
+  }, [defaultCourse?.id, selectedCourseId]);
+
+  // Safe time formatter
+  const formatCheckInTime = (iso) => {
+    if (!iso) return 'Arrived';
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return 'Arrived';
+      return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return 'Arrived';
+    }
+  };
+
   // Per-card local gate input state: { [enrollmentId]: { companions: 0, remarks: '', collectFee: boolean } }
   const [cardInputs, setCardInputs] = useState({});
 
@@ -213,7 +232,7 @@ export const VolunteerGateDesk = ({ onExit }) => {
         'Student Name': e.student_name || '',
         'Mobile Number': e.account_phone ? `+91 ${e.account_phone}` : '',
         'Check-In Status': ((e.classes_attended || 0) > 0 || e.completion_status === 'COMPLETED') ? 'ATTENDED' : 'YET TO ARRIVE',
-        'Check-In Time': e.gate_checked_in_at ? new Date(e.gate_checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '',
+        'Check-In Time': formatCheckInTime(e.gate_checked_in_at),
         'Companions / Guests': Number(e.gate_companions_count) || 0,
         'Fee Status': e.fee_status || '',
         'Amount Paid (₹)': e.amount_paid || 0,
@@ -230,6 +249,27 @@ export const VolunteerGateDesk = ({ onExit }) => {
       showToast('Failed to export Excel sheet: ' + err.message, 'danger');
     }
   };
+
+  // Loading fallback while cloud data initializes
+  if (courses.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '4rem 1.5rem', maxWidth: '600px', margin: '0 auto' }}>
+        <div style={{
+          width: '44px',
+          height: '44px',
+          border: '4px solid #e2e8f0',
+          borderTopColor: 'var(--cpet-primary)',
+          borderRadius: '50%',
+          margin: '0 auto 1.5rem',
+          animation: 'spin 1s linear infinite'
+        }} />
+        <h3 style={{ color: 'var(--cpet-primary)', marginBottom: '0.5rem' }}>Loading Gate Check-In Desk...</h3>
+        <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
+          Connecting to event candidate records...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: '840px', margin: '0 auto', padding: '0 0.5rem 3rem' }}>
@@ -603,7 +643,7 @@ export const VolunteerGateDesk = ({ onExit }) => {
                   {hasCheckedIn ? (
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#166534', marginBottom: '6px' }}>
-                        <div>🕒 {applicant.gate_checked_in_at ? new Date(applicant.gate_checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Arrived'}</div>
+                        <div>🕒 {formatCheckInTime(applicant.gate_checked_in_at)}</div>
                         {Number(applicant.gate_companions_count) > 0 && (
                           <div style={{ color: '#0369a1', fontWeight: 700 }}>+{applicant.gate_companions_count} Guests</div>
                         )}
