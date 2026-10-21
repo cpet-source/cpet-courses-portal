@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { useApp } from '../../context/AppContext';
 import {
   UserCheck,
@@ -17,7 +18,11 @@ import {
   User,
   MessageSquare,
   Sparkles,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  Download
 } from 'lucide-react';
 import { StudentBulkImporterModal } from '../admin/StudentBulkImporterModal';
 
@@ -30,7 +35,11 @@ export const VolunteerGateDesk = ({ onExit }) => {
     undoGateCheckIn,
     registerOrEnrollStudent,
     setActiveRole,
-    showToast
+    showToast,
+    isOnline,
+    pendingSyncCount,
+    isSyncingQueue,
+    flushOfflineSyncQueue
   } = useApp();
 
   // Find targeted course from deep-link or default to first active non-Mahallu or any course
@@ -195,14 +204,30 @@ export const VolunteerGateDesk = ({ onExit }) => {
     }
   };
 
-  const handleExit = () => {
-    if (onExit) {
-      onExit();
-    } else {
-      setActiveRole('student');
-    }
-    if (window.history.replaceState) {
-      window.history.replaceState({}, '', window.location.pathname);
+  // Client-Side Offline Attendance Export to Excel (.xlsx)
+  const handleExportAttendance = () => {
+    try {
+      const dataRows = courseEnrollments.map((e, idx) => ({
+        'Sl No': idx + 1,
+        'Admission No': e.admission_number || '',
+        'Student Name': e.student_name || '',
+        'Mobile Number': e.account_phone ? `+91 ${e.account_phone}` : '',
+        'Check-In Status': ((e.classes_attended || 0) > 0 || e.completion_status === 'COMPLETED') ? 'ATTENDED' : 'YET TO ARRIVE',
+        'Check-In Time': e.gate_checked_in_at ? new Date(e.gate_checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '',
+        'Companions / Guests': Number(e.gate_companions_count) || 0,
+        'Fee Status': e.fee_status || '',
+        'Amount Paid (₹)': e.amount_paid || 0,
+        'Gate Remarks': e.gate_remarks || ''
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(dataRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Gate Attendance');
+      const filename = `Gate_Attendance_${activeCourse?.course_code || 'Event'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, filename);
+      showToast('Attendance spreadsheet exported successfully!');
+    } catch (err) {
+      showToast('Failed to export Excel sheet: ' + err.message, 'danger');
     }
   };
 
@@ -273,6 +298,88 @@ export const VolunteerGateDesk = ({ onExit }) => {
             </select>
           </div>
         )}
+
+        {/* Live Network & Offline Sync Status Strip */}
+        <div style={{
+          marginTop: '1rem',
+          padding: '0.45rem 0.85rem',
+          borderRadius: '8px',
+          background: !isOnline
+            ? 'rgba(245, 158, 11, 0.22)'
+            : pendingSyncCount > 0
+              ? 'rgba(234, 179, 8, 0.22)'
+              : 'rgba(34, 197, 94, 0.22)',
+          border: !isOnline
+            ? '1px solid rgba(245, 158, 11, 0.45)'
+            : pendingSyncCount > 0
+              ? '1px solid rgba(234, 179, 8, 0.45)'
+              : '1px solid rgba(34, 197, 94, 0.45)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '8px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem' }}>
+            {!isOnline ? (
+              <>
+                <WifiOff size={15} color="#fbbf24" />
+                <span style={{ fontWeight: 700, color: '#fef3c7' }}>
+                  Offline Mode Active
+                </span>
+                <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.78rem' }}>
+                  • {pendingSyncCount} check-in(s) stored safely on this device
+                </span>
+              </>
+            ) : pendingSyncCount > 0 ? (
+              <>
+                <RefreshCw size={15} color="#fde047" className={isSyncingQueue ? 'spin' : ''} />
+                <span style={{ fontWeight: 700, color: '#fef08a' }}>
+                  {pendingSyncCount} check-in(s) waiting to sync
+                </span>
+                <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.78rem' }}>
+                  • Internet reconnected
+                </span>
+              </>
+            ) : (
+              <>
+                <Wifi size={15} color="#4ade80" />
+                <span style={{ fontWeight: 700, color: '#bbf7d0' }}>
+                  Online & Synced
+                </span>
+                <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.78rem' }}>
+                  • Cloud database connected
+                </span>
+              </>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {isOnline && pendingSyncCount > 0 && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{
+                  background: '#facc15',
+                  color: '#713f12',
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  padding: '3px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+                disabled={isSyncingQueue}
+                onClick={() => flushOfflineSyncQueue()}
+              >
+                <RefreshCw size={12} className={isSyncingQueue ? 'spin' : ''} />
+                {isSyncingQueue ? 'Syncing...' : 'Sync to Cloud Now'}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Live Gate Counter Stats */}
@@ -352,6 +459,16 @@ export const VolunteerGateDesk = ({ onExit }) => {
         </div>
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+            onClick={handleExportAttendance}
+            title="Download offline Excel sheet backup of current attendance"
+          >
+            <Download size={15} color="#0284c7" />
+            <span>Export Attendance</span>
+          </button>
+
           <button
             className="btn btn-secondary"
             style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}

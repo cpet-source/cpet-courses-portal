@@ -22,7 +22,8 @@ const STORAGE_KEYS = {
   REMITTANCES: 'cpet_remittances_prod',
   PAYOUTS: 'cpet_payouts_prod',
   ACTIVE_ROLE: 'cpet_active_role_prod',
-  CURRENT_RP_ID: 'cpet_current_rp_id_prod'
+  CURRENT_RP_ID: 'cpet_current_rp_id_prod',
+  OFFLINE_QUEUE: 'cpet_offline_sync_queue'
 };
 
 const getStored = (key, fallback) => {
@@ -79,6 +80,11 @@ export const AppProvider = ({ children }) => {
 
   const [isCloudConnected, setIsCloudConnected] = useState(false);
   const [cloudError, setCloudError] = useState(null);
+
+  // Offline Sync State
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+  const [offlineQueue, setOfflineQueue] = useState(() => getStored(STORAGE_KEYS.OFFLINE_QUEUE, []));
+  const [isSyncingQueue, setIsSyncingQueue] = useState(false);
 
   // Notification Toast state
   const [toast, setToast] = useState(null);
@@ -149,6 +155,80 @@ export const AppProvider = ({ children }) => {
     } catch (e) {
       console.warn('Network sync error:', e);
       return false;
+    }
+  };
+
+  // Add item to offline sync queue
+  const addToOfflineQueue = ({ type = 'GATE_CHECK_IN', entity = 'Enrollment', payload, studentAccount = null }) => {
+    setOfflineQueue(prev => {
+      // Keep only latest update for the same enrollment ID to prevent duplicates
+      const filtered = prev.filter(item => item.payload?.id !== payload?.id);
+      const newEntry = {
+        id: 'queue_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        timestamp: new Date().toISOString(),
+        type,
+        entity,
+        payload,
+        studentAccount
+      };
+      const updated = [...filtered, newEntry];
+      try {
+        localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  // Flush offline sync queue to MongoDB cloud via SYNC_BATCH
+  const flushOfflineSyncQueue = async () => {
+    const queue = getStored(STORAGE_KEYS.OFFLINE_QUEUE, []);
+    if (!queue || queue.length === 0) return true;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      showToast('You are currently offline. Check-ins are safe locally.', 'info');
+      return false;
+    }
+
+    setIsSyncingQueue(true);
+    try {
+      const enrollmentsToSync = [];
+      const studentAccountsToSync = [];
+
+      queue.forEach(item => {
+        if (item.payload && item.payload.id) {
+          enrollmentsToSync.push(item.payload);
+        }
+        if (item.studentAccount && item.studentAccount.account_phone) {
+          studentAccountsToSync.push(item.studentAccount);
+        }
+      });
+
+      const res = await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'SYNC_BATCH',
+          payload: {
+            enrollments: enrollmentsToSync,
+            studentAccounts: studentAccountsToSync
+          }
+        })
+      });
+
+      const data = await res.json();
+      if (data && data.success) {
+        localStorage.removeItem(STORAGE_KEYS.OFFLINE_QUEUE);
+        setOfflineQueue([]);
+        showToast(`Auto-Sync Complete: ${enrollmentsToSync.length} offline check-in record(s) synced to cloud!`, 'success');
+        return true;
+      } else {
+        console.warn('Queue flush response error:', data?.error);
+        return false;
+      }
+    } catch (err) {
+      console.warn('Network error while flushing offline sync queue:', err);
+      return false;
+    } finally {
+      setIsSyncingQueue(false);
     }
   };
 
@@ -264,7 +344,33 @@ export const AppProvider = ({ children }) => {
     setCentres(d.centres || []);
     setResourcePersons(d.resourcePersons || []);
     setStudents(d.students || []);
-    setEnrollments(d.enrollments || []);
+
+    // Merge offline pending check-in queue to prevent overwriting local check-ins
+    const queue = getStored(STORAGE_KEYS.OFFLINE_QUEUE, []);
+    const queuedEnrollmentMap = new Map();
+    queue.forEach(qItem => {
+      if (qItem.payload && qItem.payload.id) {
+        queuedEnrollmentMap.set(qItem.payload.id, qItem.payload);
+      }
+    });
+
+    const mergedEnrollments = (d.enrollments || []).map(cloudEnr => {
+      if (queuedEnrollmentMap.has(cloudEnr.id)) {
+        return queuedEnrollmentMap.get(cloudEnr.id);
+      }
+      return cloudEnr;
+    });
+
+    // Also include any offline-created spot enrollments
+    queue.forEach(qItem => {
+      if (qItem.type === 'SPOT_ENROLL' && qItem.payload?.id) {
+        if (!mergedEnrollments.some(e => e.id === qItem.payload.id)) {
+          mergedEnrollments.push(qItem.payload);
+        }
+      }
+    });
+
+    setEnrollments(mergedEnrollments);
     setClassLogs(d.classLogs || []);
     setRemittances(d.remittances || []);
     setPayouts(d.payouts || []);
@@ -311,11 +417,33 @@ export const AppProvider = ({ children }) => {
     const onFocus = () => fetchLatestFromCloud();
     window.addEventListener('focus', onFocus);
 
+    // Online / Offline network listeners
+    const handleOnline = () => {
+      setIsOnline(true);
+      flushOfflineSyncQueue();
+      fetchLatestFromCloud();
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      showToast('Working offline. All gate actions will queue locally.', 'info');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Initial check: if queue has items and we are online, auto flush
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      flushOfflineSyncQueue();
+    }
+
     // Auto-refresh every 12 seconds to pick up updates from other devices
     const interval = setInterval(fetchLatestFromCloud, 12000);
 
     return () => {
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
       clearInterval(interval);
     };
   }, []);
@@ -363,6 +491,10 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CURRENT_RP_ID, JSON.stringify(currentRpId));
   }, [currentRpId]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(offlineQueue));
+  }, [offlineQueue]);
 
   // Current active RP object
   const currentRp = resourcePersons.find(rp => rp.id === currentRpId) || resourcePersons[0];
@@ -903,13 +1035,32 @@ export const AppProvider = ({ children }) => {
 
     setEnrollments(prev => [newEnrollment, ...prev]);
 
-    // Push both StudentAccount and Enrollment to MongoDB Atlas Cloud!
-    if (accountToSave) {
-      syncToCloud('StudentAccount', accountToSave);
+    // Push both StudentAccount and Enrollment to MongoDB Atlas Cloud or Offline Queue!
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      addToOfflineQueue({
+        type: 'SPOT_ENROLL',
+        entity: 'Enrollment',
+        payload: newEnrollment,
+        studentAccount: accountToSave
+      });
+      showToast(`Admission confirmed offline! Admission No: ${admissionNumber}`, 'info');
+    } else {
+      if (accountToSave) {
+        syncToCloud('StudentAccount', accountToSave);
+      }
+      syncToCloud('Enrollment', newEnrollment).then(ok => {
+        if (!ok) {
+          addToOfflineQueue({
+            type: 'SPOT_ENROLL',
+            entity: 'Enrollment',
+            payload: newEnrollment,
+            studentAccount: accountToSave
+          });
+        }
+      });
+      showToast(`Admission confirmed! Admission No: ${admissionNumber}`);
     }
-    syncToCloud('Enrollment', newEnrollment);
 
-    showToast(`Admission confirmed! Admission No: ${admissionNumber}`);
     return newEnrollment;
   };
 
@@ -1481,6 +1632,8 @@ export const AppProvider = ({ children }) => {
   };
 
   const checkInStudentAtGate = (enrollmentId, { companionsCount = 0, remarks = '', collectFee = false, feeAmount = 0 } = {}) => {
+    let updatedEnrollment = null;
+
     setEnrollments(prev => prev.map(e => {
       if (e.id === enrollmentId) {
         const updated = {
@@ -1496,15 +1649,40 @@ export const AppProvider = ({ children }) => {
             amount_paid: Number(feeAmount) || e.amount_paid || 0
           } : {})
         };
-        syncToCloud('Enrollment', updated);
+        updatedEnrollment = updated;
         return updated;
       }
       return e;
     }));
-    showToast('Gate check-in recorded successfully!');
+
+    if (updatedEnrollment) {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        addToOfflineQueue({
+          type: 'GATE_CHECK_IN',
+          entity: 'Enrollment',
+          payload: updatedEnrollment
+        });
+        showToast('Offline check-in saved! Will sync when reconnected.', 'info');
+      } else {
+        syncToCloud('Enrollment', updatedEnrollment).then(ok => {
+          if (!ok) {
+            addToOfflineQueue({
+              type: 'GATE_CHECK_IN',
+              entity: 'Enrollment',
+              payload: updatedEnrollment
+            });
+            showToast('Cloud connection interrupted. Saved to offline queue.', 'warning');
+          } else {
+            showToast('Gate check-in recorded & synced!');
+          }
+        });
+      }
+    }
   };
 
   const undoGateCheckIn = (enrollmentId) => {
+    let updatedEnrollment = null;
+
     setEnrollments(prev => prev.map(e => {
       if (e.id === enrollmentId) {
         const updated = {
@@ -1512,14 +1690,36 @@ export const AppProvider = ({ children }) => {
           classes_attended: 0,
           attended_sessions: [],
           completion_status: 'IN_PROGRESS',
-          gate_checked_in_at: null
+          gate_checked_in_at: null,
+          gate_companions_count: 0
         };
-        syncToCloud('Enrollment', updated);
+        updatedEnrollment = updated;
         return updated;
       }
       return e;
     }));
-    showToast('Check-in status reverted.', 'info');
+
+    if (updatedEnrollment) {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        addToOfflineQueue({
+          type: 'UNDO_CHECK_IN',
+          entity: 'Enrollment',
+          payload: updatedEnrollment
+        });
+        showToast('Check-in status reverted offline.', 'info');
+      } else {
+        syncToCloud('Enrollment', updatedEnrollment).then(ok => {
+          if (!ok) {
+            addToOfflineQueue({
+              type: 'UNDO_CHECK_IN',
+              entity: 'Enrollment',
+              payload: updatedEnrollment
+            });
+          }
+        });
+        showToast('Check-in status reverted.', 'info');
+      }
+    }
   };
 
   const toggleStudentSessionAttendance = (enrollmentId, sessionNumber) => {
@@ -1635,7 +1835,12 @@ export const AppProvider = ({ children }) => {
         checkInStudentAtGate,
         undoGateCheckIn,
         toggleStudentSessionAttendance,
-        batchMarkSessionAttendance
+        batchMarkSessionAttendance,
+        isOnline,
+        offlineQueue,
+        pendingSyncCount: offlineQueue.length,
+        isSyncingQueue,
+        flushOfflineSyncQueue
       }}
     >
       {children}

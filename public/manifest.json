@@ -1,0 +1,17 @@
+{
+  "short_name": "CPET Portal",
+  "name": "CPET Courses & Gate Check-In Portal",
+  "start_url": "/",
+  "background_color": "#32357e",
+  "theme_color": "#32357e",
+  "display": "standalone",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "48x46 192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}

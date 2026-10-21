@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { useApp } from '../../context/AppContext';
 import {
   UserCheck,
@@ -15,7 +16,11 @@ import {
   Phone,
   Copy,
   ExternalLink,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  Download
 } from 'lucide-react';
 import { StudentBulkImporterModal } from './StudentBulkImporterModal';
 
@@ -26,7 +31,11 @@ export const EventCheckInDesk = () => {
     checkInStudentAtGate,
     undoGateCheckIn,
     registerOrEnrollStudent,
-    showToast
+    showToast,
+    isOnline,
+    pendingSyncCount,
+    isSyncingQueue,
+    flushOfflineSyncQueue
   } = useApp();
 
   const generalCourses = courses.filter(c => c.category !== 'MAHALLU');
@@ -186,6 +195,33 @@ export const EventCheckInDesk = () => {
     showToast('Volunteer Gate Desk link copied! Share this with your student volunteers via WhatsApp.');
   };
 
+  // Client-Side Offline Attendance Export to Excel (.xlsx)
+  const handleExportAttendance = () => {
+    try {
+      const dataRows = courseEnrollments.map((e, idx) => ({
+        'Sl No': idx + 1,
+        'Admission No': e.admission_number || '',
+        'Student Name': e.student_name || '',
+        'Mobile Number': e.account_phone ? `+91 ${e.account_phone}` : '',
+        'Check-In Status': ((e.classes_attended || 0) > 0 || e.completion_status === 'COMPLETED') ? 'ATTENDED' : 'YET TO ARRIVE',
+        'Check-In Time': e.gate_checked_in_at ? new Date(e.gate_checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '',
+        'Companions / Guests': Number(e.gate_companions_count) || 0,
+        'Fee Status': e.fee_status || '',
+        'Amount Paid (₹)': e.amount_paid || 0,
+        'Gate Remarks': e.gate_remarks || ''
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(dataRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Gate Attendance');
+      const filename = `Gate_Attendance_${activeCourse?.course_code || 'Event'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, filename);
+      showToast('Attendance spreadsheet exported successfully!');
+    } catch (err) {
+      showToast('Failed to export Excel sheet: ' + err.message, 'danger');
+    }
+  };
+
   return (
     <div>
       <div className="cpet-card-header" style={{ marginBottom: '1.25rem' }}>
@@ -246,6 +282,75 @@ export const EventCheckInDesk = () => {
         </div>
       )}
 
+      {/* Live Network & Offline Sync Status Strip */}
+      <div style={{
+        marginBottom: '1.25rem',
+        padding: '0.65rem 1rem',
+        borderRadius: 'var(--radius-md)',
+        background: !isOnline
+          ? '#fffbeb'
+          : pendingSyncCount > 0
+            ? '#fefce8'
+            : '#f0fdf4',
+        border: !isOnline
+          ? '1.5px solid #fde68a'
+          : pendingSyncCount > 0
+            ? '1.5px solid #fef08a'
+            : '1.5px solid #bbf7d0',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '0.75rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
+          {!isOnline ? (
+            <>
+              <WifiOff size={18} color="#d97706" />
+              <div>
+                <strong style={{ color: '#92400e' }}>Offline Mode Active</strong>
+                <span style={{ color: '#78350f', marginLeft: '6px', fontSize: '0.8rem' }}>
+                  • {pendingSyncCount} check-in(s) queued locally. Zero risk of data loss.
+                </span>
+              </div>
+            </>
+          ) : pendingSyncCount > 0 ? (
+            <>
+              <RefreshCw size={18} color="#ca8a04" className={isSyncingQueue ? 'spin' : ''} />
+              <div>
+                <strong style={{ color: '#854d0e' }}>{pendingSyncCount} check-in(s) waiting to sync</strong>
+                <span style={{ color: '#713f12', marginLeft: '6px', fontSize: '0.8rem' }}>
+                  • Internet active. Ready to sync to MongoDB Atlas.
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <Wifi size={18} color="#16a34a" />
+              <div>
+                <strong style={{ color: '#15803d' }}>Online & Fully Synced</strong>
+                <span style={{ color: '#166534', marginLeft: '6px', fontSize: '0.8rem' }}>
+                  • Connected to MongoDB Atlas cloud database.
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {isOnline && pendingSyncCount > 0 && (
+          <button
+            type="button"
+            className="btn btn-warning btn-sm"
+            style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}
+            disabled={isSyncingQueue}
+            onClick={() => flushOfflineSyncQueue()}
+          >
+            <RefreshCw size={13} className={isSyncingQueue ? 'spin' : ''} />
+            {isSyncingQueue ? 'Syncing Records...' : 'Sync to Cloud Now'}
+          </button>
+        )}
+      </div>
+
       {/* Event Selector & Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div style={{ flex: 1, minWidth: '280px' }}>
@@ -265,6 +370,16 @@ export const EventCheckInDesk = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '8px', alignSelf: 'flex-end', flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '42px' }}
+            onClick={handleExportAttendance}
+            title="Download instant offline Excel spreadsheet of current attendance"
+          >
+            <Download size={15} color="#0284c7" />
+            <span>Export Attendance</span>
+          </button>
+
           <button
             className="btn btn-secondary"
             style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '42px' }}
