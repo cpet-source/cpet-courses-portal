@@ -644,6 +644,54 @@ a {
   background: #f8fafc;
 }
 
+/* Gate Desk Portrait 4-in-a-row Grid */
+.gate-cards-portrait-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.85rem;
+}
+
+@media (max-width: 1200px) {
+  .gate-cards-portrait-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
+  .gate-cards-portrait-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 540px) {
+  .gate-cards-portrait-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gate-portrait-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
+  background: white;
+  border: 1.5px solid var(--cpet-border);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  min-height: 230px;
+}
+
+.gate-portrait-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #cbd5e1;
+}
+
+.gate-portrait-card.checked-in {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
 .card-top {
   display: flex;
   align-items: flex-start;

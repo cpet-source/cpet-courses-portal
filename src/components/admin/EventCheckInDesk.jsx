@@ -379,10 +379,10 @@ export const EventCheckInDesk = () => {
         </div>
       </div>
 
-      {/* Candidate Cards List */}
-      <div className="mobile-card-list">
+      {/* Candidate Cards Grid (4 per row on laptop/tablet) */}
+      <div className="gate-cards-portrait-grid">
         {filteredApplicants.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2.5rem', background: 'white', borderRadius: 'var(--radius-lg)', border: '1px solid var(--cpet-border)', color: '#64748b' }}>
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2.5rem', background: 'white', borderRadius: 'var(--radius-lg)', border: '1px solid var(--cpet-border)', color: '#64748b' }}>
             No registered students found matching your criteria.
           </div>
         ) : (
@@ -398,154 +398,148 @@ export const EventCheckInDesk = () => {
             return (
               <div
                 key={applicant.id}
-                className="mobile-data-card"
-                style={{
-                  borderLeft: hasCheckedIn ? '5px solid var(--cpet-success)' : '5px solid var(--cpet-border)',
-                  background: hasCheckedIn ? '#f0fdf4' : 'white',
-                  borderRadius: 'var(--radius-md)',
-                  marginBottom: '0.75rem',
-                  padding: '1rem',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-                }}
+                className={`gate-portrait-card ${hasCheckedIn ? 'checked-in' : ''}`}
               >
-                <div className="card-top">
-                  <div>
-                    <h4 className="card-title" style={{ fontSize: '1.05rem', margin: '0 0 2px' }}>
-                      {applicant.student_name}
-                    </h4>
-                    <p className="card-subtitle" style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
-                      📱 +91 {applicant.account_phone} | Adm: <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--cpet-primary)' }}>{applicant.admission_number}</span>
-                    </p>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                    <span className={`badge ${hasCheckedIn ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: '0.72rem' }}>
+                {/* Top Section */}
+                <div>
+                  {/* Status Badges */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
+                    <span className={`badge ${hasCheckedIn ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
                       {hasCheckedIn ? '✓ ATTENDED' : 'YET TO ARRIVE'}
                     </span>
 
                     {/* Payment Badge */}
                     {isPayAtRegistration ? (
-                      <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>
-                        ✓ Paid Online
+                      <span className="badge badge-success" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
+                        ✓ Paid
                       </span>
                     ) : isFree ? (
-                      <span className="badge badge-neutral" style={{ fontSize: '0.72rem' }}>
-                        Free Entry
+                      <span className="badge badge-neutral" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
+                        Free
                       </span>
                     ) : isFeePaid ? (
-                      <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>
+                      <span className="badge badge-success" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
                         ✓ Paid ₹{applicant.amount_paid || standardFee}
                       </span>
                     ) : (
-                      <span className="badge badge-warning" style={{ fontSize: '0.72rem', background: '#fef3c7', color: '#92400e' }}>
-                        ⏳ Fee Due: ₹{standardFee}
+                      <span className="badge badge-warning" style={{ fontSize: '0.68rem', padding: '2px 6px', background: '#fef3c7', color: '#92400e' }}>
+                        ⏳ Due ₹{standardFee}
                       </span>
                     )}
                   </div>
+
+                  {/* Student Name */}
+                  <h4 style={{ fontSize: '1rem', fontWeight: 800, margin: '0 0 3px', color: 'var(--cpet-primary)', lineHeight: 1.3, wordBreak: 'break-word' }}>
+                    {applicant.student_name}
+                  </h4>
+
+                  {/* Phone & Admission Number */}
+                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '4px' }}>
+                    <div style={{ fontFamily: 'monospace', fontWeight: 600 }}>📱 +91 {applicant.account_phone}</div>
+                    <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                      Adm: <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--cpet-primary)' }}>{applicant.admission_number}</span>
+                    </div>
+                  </div>
+
+                  {/* District / Place if available */}
+                  {(applicant.district || applicant.place) && (
+                    <div style={{ fontSize: '0.72rem', color: '#475569', marginBottom: '4px' }}>
+                      📍 {applicant.district} {applicant.place ? `• ${applicant.place}` : ''}
+                    </div>
+                  )}
+
+                  {/* Custom Responses preview */}
+                  {applicant.custom_responses && Object.keys(applicant.custom_responses).length > 0 && (
+                    <div style={{ background: hasCheckedIn ? 'white' : '#f8fafc', padding: '4px 6px', borderRadius: '4px', fontSize: '0.7rem', margin: '4px 0', border: '1px solid #edf2f7' }}>
+                      {Object.entries(applicant.custom_responses).slice(0, 2).map(([k, v]) => (
+                        <div key={k} style={{ color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <strong style={{ color: 'var(--cpet-primary)' }}>{k}:</strong> {Array.isArray(v) ? v.join(', ') : String(v)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {/* Custom Responses */}
-                {applicant.custom_responses && Object.keys(applicant.custom_responses).length > 0 && (
-                  <div style={{ background: '#f8fafc', padding: '0.45rem 0.65rem', borderRadius: '6px', fontSize: '0.78rem', margin: '0.4rem 0', border: '1px solid #edf2f7' }}>
-                    {Object.entries(applicant.custom_responses).map(([k, v]) => (
-                      <span key={k} style={{ display: 'inline-block', marginRight: '0.85rem', color: '#475569' }}>
-                        <strong style={{ color: 'var(--cpet-primary)' }}>{k}:</strong> {Array.isArray(v) ? v.join(', ') : String(v)}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Already Checked-In View */}
-                {hasCheckedIn ? (
-                  <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #dcfce7', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.78rem', color: '#166534' }}>
+                {/* Middle & Bottom Section */}
+                <div style={{ marginTop: '0.65rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9' }}>
+                  {hasCheckedIn ? (
                     <div>
-                      <span>Checked-in: {applicant.gate_checked_in_at ? new Date(applicant.gate_checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Arrived'}</span>
-                      {Number(applicant.gate_companions_count) > 0 && (
-                        <strong style={{ marginLeft: '8px', color: '#0369a1' }}>
-                          (+{applicant.gate_companions_count} Guests)
-                        </strong>
-                      )}
-                      {applicant.gate_remarks && (
-                        <span style={{ display: 'block', color: '#475569', fontStyle: 'italic', marginTop: '2px' }}>
-                          Note: "{applicant.gate_remarks}"
-                        </span>
-                      )}
+                      <div style={{ fontSize: '0.75rem', color: '#166534', marginBottom: '6px' }}>
+                        <div>🕒 {applicant.gate_checked_in_at ? new Date(applicant.gate_checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Arrived'}</div>
+                        {Number(applicant.gate_companions_count) > 0 && (
+                          <div style={{ color: '#0369a1', fontWeight: 700 }}>+{applicant.gate_companions_count} Guests</div>
+                        )}
+                        {applicant.gate_remarks && (
+                          <div style={{ fontStyle: 'italic', color: '#475569', fontSize: '0.7rem' }}>"{applicant.gate_remarks}"</div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        style={{ width: '100%', fontSize: '0.72rem', padding: '0.25rem', color: '#dc2626', borderColor: '#fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                        onClick={() => handleUndoCheckIn(applicant)}
+                      >
+                        <RotateCcw size={12} /> Undo Check-In
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', color: '#dc2626', borderColor: '#fca5a5' }}
-                      onClick={() => handleUndoCheckIn(applicant)}
-                    >
-                      <RotateCcw size={12} /> Undo
-                    </button>
-                  </div>
-                ) : (
-                  /* Check-In Inputs & Action */
-                  <div style={{ marginTop: '0.65rem', paddingTop: '0.65rem', borderTop: '1px solid #f1f5f9' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem', marginBottom: '0.65rem' }}>
-                      {/* Companions counter */}
-                      <div style={{ background: '#f8fafc', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>Companions:</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  ) : (
+                    <div>
+                      {/* Compact Companions & Remarks row */}
+                      <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
+                        <div style={{ background: '#f8fafc', padding: '2px 4px', borderRadius: '4px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '4px' }} title="Companions/Guests">
                           <button
                             type="button"
-                            style={{ width: '22px', height: '22px', borderRadius: '4px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer', fontWeight: 700 }}
+                            style={{ width: '18px', height: '18px', borderRadius: '3px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '0.7rem', padding: 0, lineHeight: 1 }}
                             onClick={() => updateCardInput(applicant.id, 'companions', Math.max(0, (inputs.companions || 0) - 1))}
                           >
                             -
                           </button>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 700, minWidth: '16px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, minWidth: '12px', textAlign: 'center' }}>
                             {inputs.companions || 0}
                           </span>
                           <button
                             type="button"
-                            style={{ width: '22px', height: '22px', borderRadius: '4px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer', fontWeight: 700 }}
+                            style={{ width: '18px', height: '18px', borderRadius: '3px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '0.7rem', padding: 0, lineHeight: 1 }}
                             onClick={() => updateCardInput(applicant.id, 'companions', (inputs.companions || 0) + 1)}
                           >
                             +
                           </button>
                         </div>
-                      </div>
-
-                      {/* Remarks input */}
-                      <div>
                         <input
                           type="text"
                           className="form-input"
-                          style={{ fontSize: '0.78rem', padding: '0.35rem 0.5rem', height: '100%' }}
-                          placeholder="Special remarks (optional)..."
+                          style={{ fontSize: '0.72rem', padding: '2px 6px', flex: 1, minWidth: 0 }}
+                          placeholder="Note..."
                           value={inputs.remarks || ''}
                           onChange={e => updateCardInput(applicant.id, 'remarks', e.target.value)}
                         />
                       </div>
+
+                      {/* Spot Fee Checkbox (only if due) */}
+                      {!isPayAtRegistration && !isFree && !isFeePaid && standardFee > 0 && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', background: '#fffbeb', border: '1px solid #fde68a', padding: '2px 4px', borderRadius: '4px', marginBottom: '6px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(inputs.collectFee)}
+                            onChange={e => updateCardInput(applicant.id, 'collectFee', e.target.checked)}
+                          />
+                          <span style={{ fontWeight: 600, color: '#92400e' }}>Collect ₹{standardFee}</span>
+                        </label>
+                      )}
+
+                      {/* Big Check-In Button */}
+                      <button
+                        type="button"
+                        className="btn btn-success"
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '0.45rem', fontWeight: 700, fontSize: '0.85rem' }}
+                        onClick={() => handleGateCheckIn(applicant)}
+                      >
+                        <CheckCircle size={15} />
+                        <span>Check-In</span>
+                      </button>
                     </div>
-
-                    {/* Spot Fee Checkbox (only if due) */}
-                    {!isPayAtRegistration && !isFree && !isFeePaid && standardFee > 0 && (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', background: '#fffbeb', border: '1px solid #fde68a', padding: '0.4rem 0.65rem', borderRadius: '6px', marginBottom: '0.65rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(inputs.collectFee)}
-                          onChange={e => updateCardInput(applicant.id, 'collectFee', e.target.checked)}
-                        />
-                        <span style={{ fontWeight: 600, color: '#92400e' }}>
-                          Collect Entrance Fee: ₹{standardFee} (Cash / Spot UPI)
-                        </span>
-                      </label>
-                    )}
-
-                    <button
-                      type="button"
-                      className="btn btn-success"
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '0.55rem', fontWeight: 700 }}
-                      onClick={() => handleGateCheckIn(applicant)}
-                    >
-                      <CheckCircle size={16} />
-                      <span>Check-In Attended</span>
-                    </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             );
           })
