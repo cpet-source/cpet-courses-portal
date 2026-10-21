@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download, Building, Upload, Image as ImageIcon, Users, Layers, Search, Filter, X, AlertCircle, UserCheck, Table, ClipboardList } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Edit2, Link, CheckCircle, ExternalLink, HelpCircle, FileText, Download, Building, Upload, Image as ImageIcon, Users, Layers, Search, Filter, X, AlertCircle, UserCheck, Table, ClipboardList, FileSpreadsheet } from 'lucide-react';
+import { StudentBulkImporterModal } from './StudentBulkImporterModal';
 
 export const CoursesManager = () => {
   const {
@@ -24,6 +25,10 @@ export const CoursesManager = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingCourseId, setEditingCourseId] = useState(null);
   const [courseToDelete, setCourseToDelete] = useState(null);
+
+  // Bulk Student Import Modal State
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importTargetCourseId, setImportTargetCourseId] = useState('');
 
   // Enrolled Students Modal State
   const [selectedCourseForStudentsModal, setSelectedCourseForStudentsModal] = useState(null);
@@ -956,6 +961,20 @@ export const CoursesManager = () => {
                   <UserCheck size={13} />
                   <span>Gate Desk Link</span>
                 </button>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  onClick={() => {
+                    setImportTargetCourseId(course.id);
+                    setShowImportModal(true);
+                  }}
+                  title="Import student admissions from Google Forms or Excel file into this course"
+                >
+                  <FileSpreadsheet size={13} color="#2563eb" />
+                  <span>Import Excel</span>
+                </button>
               </div>
 
               <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
@@ -1870,6 +1889,13 @@ export const CoursesManager = () => {
           </div>
         </div>
       )}
+
+      {/* Bulk Student & Google Form Importer Modal */}
+      <StudentBulkImporterModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        initialCourseId={importTargetCourseId}
+      />
     </div>
   );
 };

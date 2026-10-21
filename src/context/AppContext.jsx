@@ -913,6 +913,158 @@ export const AppProvider = ({ children }) => {
     return newEnrollment;
   };
 
+  // High-Performance Bulk Student & Enrollment Importer (from Excel, Google Forms, CSV)
+  const batchEnrollStudents = async ({
+    courseId,
+    batchId,
+    centreId,
+    defaultFeeStatus = 'OFFICE_CONFIRMED',
+    studentsList = []
+  }) => {
+    const targetCourse = courses.find(c => c.id === courseId);
+    const targetCentre = centres.find(c => c.id === centreId);
+
+    let currentSeq = enrollments.filter(e => e.course_id === courseId).length;
+    const pattern = targetCourse?.admission_no_pattern || 'CPET-{CODE}-26-{SEQ}';
+
+    let assignedBatchId = null;
+    let assignedBatchName = null;
+    if (targetCourse?.category !== 'MAHALLU') {
+      const courseBatches = Array.isArray(targetCourse?.batches) ? targetCourse.batches : [];
+      if (batchId) {
+        const found = courseBatches.find(b => b.id === batchId || b.batch_name === batchId);
+        assignedBatchId = found ? found.id : batchId;
+        assignedBatchName = found ? found.batch_name : (typeof batchId === 'string' ? batchId : 'Batch 1');
+      } else {
+        const openBatch = courseBatches.find(b => b.status === 'ADMISSIONS_OPEN') || courseBatches[courseBatches.length - 1];
+        if (openBatch) {
+          assignedBatchId = openBatch.id;
+          assignedBatchName = openBatch.batch_name;
+        } else {
+          assignedBatchId = 'batch-1';
+          assignedBatchName = 'Batch 1';
+        }
+      }
+    }
+
+    const newAccountsMap = new Map();
+    students.forEach(acc => {
+      const phone = (acc.account_phone || '').trim().replace(/\D/g, '').slice(-10);
+      if (phone) newAccountsMap.set(phone, JSON.parse(JSON.stringify(acc)));
+    });
+
+    const newEnrollmentsList = [];
+    const accountsToSyncMap = new Map();
+
+    studentsList.forEach((row, idx) => {
+      const cleanPhone = (row.phone || '').trim().replace(/\D/g, '').slice(-10);
+      if (!cleanPhone || cleanPhone.length !== 10) return;
+
+      currentSeq++;
+      const seqStr = String(currentSeq).padStart(4, '0');
+      const admissionNumber = pattern
+        .replace('{CODE}', targetCourse?.course_code || 'GEN')
+        .replace('{SEQ}', seqStr);
+
+      const fullName = (row.full_name || row.student_name || 'Student').trim();
+      const rawGender = (row.gender || '').toUpperCase().trim();
+      const gender = (rawGender.includes('FEMALE') || rawGender.includes('GIRL') || rawGender.includes('WOMAN') || rawGender === 'F') ? 'FEMALE' : 'MALE';
+      const place = (row.place || row.city || '').trim();
+      const district = (row.district || 'Malappuram').trim();
+      const dob = row.date_of_birth || row.dob || '';
+
+      let account = newAccountsMap.get(cleanPhone);
+      let activeProfileId = '';
+
+      if (account) {
+        let profile = account.members.find(m => m.full_name?.toLowerCase() === fullName.toLowerCase());
+        if (!profile) {
+          profile = {
+            id: `prof-${Date.now()}-${idx}`,
+            full_name: fullName,
+            gender: gender,
+            date_of_birth: dob,
+            relationship: 'Member',
+            place: place || (targetCentre ? targetCentre.place : ''),
+            district: district || (targetCentre ? targetCentre.district : '')
+          };
+          account.members.push(profile);
+        }
+        activeProfileId = profile.id;
+        accountsToSyncMap.set(cleanPhone, account);
+      } else {
+        const newProfile = {
+          id: `prof-${Date.now()}-${idx}`,
+          full_name: fullName,
+          gender: gender,
+          date_of_birth: dob,
+          relationship: 'Self',
+          place: place || (targetCentre ? targetCentre.place : ''),
+          district: district || (targetCentre ? targetCentre.district : '')
+        };
+        activeProfileId = newProfile.id;
+        account = {
+          account_phone: cleanPhone,
+          whatsapp_number: cleanPhone,
+          members: [newProfile]
+        };
+        newAccountsMap.set(cleanPhone, account);
+        accountsToSyncMap.set(cleanPhone, account);
+      }
+
+      const enr = {
+        id: `enr-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+        account_phone: cleanPhone,
+        student_profile_id: activeProfileId,
+        student_name: fullName,
+        course_id: courseId,
+        course_title: targetCourse?.title || 'Course',
+        centre_id: centreId || null,
+        centre_name: targetCentre ? targetCentre.centre_name : (targetCourse?.category === 'ONLINE' ? 'Online Session' : 'CPET Main Campus'),
+        batch_id: assignedBatchId,
+        batch_name: assignedBatchName,
+        admission_number: admissionNumber,
+        enrollment_date: new Date().toISOString().split('T')[0],
+        fee_status: row.fee_status || defaultFeeStatus,
+        amount_paid: Number(row.amount_paid) || (defaultFeeStatus === 'OFFICE_CONFIRMED' ? (targetCourse?.standard_fee || 0) : 0),
+        completion_status: 'IN_PROGRESS',
+        classes_attended: 0,
+        marks: {},
+        custom_responses: row.custom_responses || {}
+      };
+
+      newEnrollmentsList.push(enr);
+    });
+
+    if (newEnrollmentsList.length === 0) {
+      showToast('No valid students found with 10-digit mobile numbers', 'warning');
+      return { success: false, count: 0 };
+    }
+
+    setStudents(Array.from(newAccountsMap.values()));
+    setEnrollments(prev => [...newEnrollmentsList, ...prev]);
+
+    // Batch sync to MongoDB Atlas Cloud
+    try {
+      await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'SYNC_BATCH',
+          payload: {
+            studentAccounts: Array.from(accountsToSyncMap.values()),
+            enrollments: newEnrollmentsList
+          }
+        })
+      });
+    } catch (e) {
+      console.warn('Batch cloud sync error:', e);
+    }
+
+    showToast(`Successfully enrolled ${newEnrollmentsList.length} students into ${targetCourse?.title || 'course'}!`);
+    return { success: true, count: newEnrollmentsList.length };
+  };
+
   // Update student profile details (gender, DoB, name, location, phone)
   const updateStudentProfile = ({
     enrollmentId,
@@ -1463,6 +1615,7 @@ export const AppProvider = ({ children }) => {
         deleteResourcePerson,
         lookupStudentByPhone,
         registerOrEnrollStudent,
+        batchEnrollStudents,
         addClassLog,
         updateClassLog,
         deleteClassLog,

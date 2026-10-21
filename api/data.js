@@ -177,6 +177,23 @@ export default async function handler(req, res) {
         }
       }
 
+      if (type === 'SYNC_BATCH') {
+        const { studentAccounts = [], enrollments = [] } = payload || {};
+        const ops = [];
+        for (const s of studentAccounts) {
+          if (s.account_phone) {
+            ops.push(StudentAccount.findOneAndUpdate({ account_phone: s.account_phone }, s, { upsert: true, new: true }));
+          }
+        }
+        for (const e of enrollments) {
+          if (e.id) {
+            ops.push(Enrollment.findOneAndUpdate({ id: e.id }, e, { upsert: true, new: true }));
+          }
+        }
+        await Promise.all(ops);
+        return res.status(200).json({ success: true, count: enrollments.length });
+      }
+
       if (type === 'DELETE_ENTITY') {
         const { entityName, id, account_phone } = payload || {};
         let Model;

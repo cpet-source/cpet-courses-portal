@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Search, Download, MessageCircle, Eye, CheckCircle, Clock, AlertCircle, Filter, UserCheck, Calendar, RefreshCw, Trash2, Edit2 } from 'lucide-react';
+import { Search, Download, MessageCircle, Eye, CheckCircle, Clock, AlertCircle, Filter, UserCheck, Calendar, RefreshCw, Trash2, Edit2, Upload } from 'lucide-react';
 import { KERALA_DISTRICTS } from '../../data/districts';
+import { StudentBulkImporterModal } from './StudentBulkImporterModal';
 
 export const StudentsMasterDirectory = () => {
   const {
@@ -21,6 +22,7 @@ export const StudentsMasterDirectory = () => {
   const [selectedFeeFilter, setSelectedFeeFilter] = useState('ALL');
   const [selectedStudentFor360, setSelectedStudentFor360] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Student Deletion State
   const [studentToDelete, setStudentToDelete] = useState(null);
@@ -265,6 +267,15 @@ export const StudentsMasterDirectory = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#2563eb' }}
+            onClick={() => setShowImportModal(true)}
+            title="Import student admissions from Google Form or Excel file"
+          >
+            <Upload size={16} />
+            <span>Import from Excel / Google Form</span>
+          </button>
           <button
             className="btn btn-secondary"
             onClick={handleRefresh}
@@ -991,6 +1002,12 @@ export const StudentsMasterDirectory = () => {
           </div>
         </div>
       )}
+
+      {/* Bulk Student & Google Form Importer Modal */}
+      <StudentBulkImporterModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+      />
     </div>
   );
 };

@@ -14,8 +14,10 @@ import {
   X,
   Phone,
   Copy,
-  ExternalLink
+  ExternalLink,
+  FileSpreadsheet
 } from 'lucide-react';
+import { StudentBulkImporterModal } from './StudentBulkImporterModal';
 
 export const EventCheckInDesk = () => {
   const {
@@ -36,6 +38,7 @@ export const EventCheckInDesk = () => {
 
   // Spot Walk-In Registration Modal state
   const [showSpotModal, setShowSpotModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [spotForm, setSpotForm] = useState({
     full_name: '',
     phone: '',
@@ -261,14 +264,26 @@ export const EventCheckInDesk = () => {
           </select>
         </div>
 
-        <button
-          className="btn btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-end', height: '42px' }}
-          onClick={() => setShowSpotModal(true)}
-        >
-          <Plus size={16} />
-          <span>Spot Walk-In Candidate</span>
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignSelf: 'flex-end', flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '42px' }}
+            onClick={() => setShowImportModal(true)}
+            title="Import student admissions from Excel or Google Form into this course"
+          >
+            <FileSpreadsheet size={16} color="#16a34a" />
+            <span>Import from Excel</span>
+          </button>
+
+          <button
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '42px' }}
+            onClick={() => setShowSpotModal(true)}
+          >
+            <Plus size={16} />
+            <span>Spot Walk-In Candidate</span>
+          </button>
+        </div>
       </div>
 
       {/* Live Gate Counter Stats */}
@@ -660,6 +675,13 @@ export const EventCheckInDesk = () => {
           </div>
         </div>
       )}
+
+      {/* Bulk Student & Google Form Importer Modal */}
+      <StudentBulkImporterModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        initialCourseId={selectedCourseId}
+      />
     </div>
   );
 };
