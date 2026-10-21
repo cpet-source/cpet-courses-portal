@@ -73,6 +73,19 @@ export const VolunteerGateDesk = ({ onExit }) => {
     }
   };
 
+  // Exit Desk handler
+  const handleExit = () => {
+    if (onExit) {
+      onExit();
+    } else {
+      setActiveRole('student');
+      try {
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.pushState({}, '', cleanUrl);
+      } catch (e) {}
+    }
+  };
+
   // Per-card local gate input state: { [enrollmentId]: { companions: 0, remarks: '', collectFee: boolean } }
   const [cardInputs, setCardInputs] = useState({});
 
