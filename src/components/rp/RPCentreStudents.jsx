@@ -13,7 +13,8 @@ import {
   AlertCircle,
   Layers,
   ChevronRight,
-  GraduationCap
+  GraduationCap,
+  Clock
 } from 'lucide-react';
 
 export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation }) => {
@@ -275,9 +276,32 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
     showToast(`Course added to Study Centre! Now you can enroll students.`, 'success');
   };
 
+  // Payment editing state
+  const [editingFeeStudentId, setEditingFeeStudentId] = useState(null);
+  const [editingFeeAmount, setEditingFeeAmount] = useState('');
+
+  const startEditingFee = (student) => {
+    setEditingFeeStudentId(student.id);
+    setEditingFeeAmount(String(student.amount_paid || 0));
+  };
+
+  const handleSaveFee = (studentId) => {
+    const amt = Math.max(0, Number(editingFeeAmount) || 0);
+    updateStudentFee(studentId, amt);
+    setEditingFeeStudentId(null);
+    setEditingFeeAmount('');
+  };
+
   // Summary stats for currently selected batch
-  const paidCount = batchStudents.filter(
-    s => s.fee_status === 'PAID_TO_RP' || s.fee_status === 'OFFICE_CONFIRMED'
+  const standardFee = Number(selectedCourse?.standard_fee) || 0;
+  const isFreeCourse = selectedCourse?.payment_policy === 'FREE_COURSE' || standardFee === 0;
+
+  const totalBatchCollected = batchStudents.reduce((sum, s) => sum + (Number(s.amount_paid) || 0), 0);
+  const totalBatchExpected = isFreeCourse ? 0 : batchStudents.length * standardFee;
+  const totalBatchDues = Math.max(0, totalBatchExpected - totalBatchCollected);
+
+  const fullyPaidCount = batchStudents.filter(
+    s => isFreeCourse || (Number(s.amount_paid) || 0) >= standardFee || s.fee_status === 'PAID_TO_RP' || s.fee_status === 'OFFICE_CONFIRMED'
   ).length;
 
   return (
@@ -715,15 +739,23 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
             </div>
 
             {/* Batch Metrics */}
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
               <div style={{ background: '#f8fafc', padding: '0.4rem 0.75rem', borderRadius: '6px', border: '1px solid var(--cpet-border)', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>Enrolled</span>
+                <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>Students</span>
                 <strong style={{ fontSize: '1rem', color: 'var(--cpet-primary)' }}>{batchStudents.length}</strong>
               </div>
-              <div style={{ background: '#f8fafc', padding: '0.4rem 0.75rem', borderRadius: '6px', border: '1px solid var(--cpet-border)', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>Fee Paid</span>
-                <strong style={{ fontSize: '1rem', color: '#16a34a' }}>{paidCount}</strong>
+              <div style={{ background: '#f0fdf4', padding: '0.4rem 0.75rem', borderRadius: '6px', border: '1px solid #bbf7d0', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.7rem', color: '#166534', display: 'block' }}>Fees Credited (RP)</span>
+                <strong style={{ fontSize: '1rem', color: '#16a34a' }}>₹{totalBatchCollected.toLocaleString('en-IN')}</strong>
               </div>
+              {!isFreeCourse && (
+                <div style={{ background: totalBatchDues > 0 ? '#fef2f2' : '#f8fafc', padding: '0.4rem 0.75rem', borderRadius: '6px', border: totalBatchDues > 0 ? '1px solid #fecaca' : '1px solid var(--cpet-border)', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.7rem', color: totalBatchDues > 0 ? '#991b1b' : '#64748b', display: 'block' }}>Dues Outstanding</span>
+                  <strong style={{ fontSize: '1rem', color: totalBatchDues > 0 ? '#dc2626' : '#16a34a' }}>
+                    {totalBatchDues > 0 ? `₹${totalBatchDues.toLocaleString('en-IN')}` : 'All Clear ✓'}
+                  </strong>
+                </div>
+              )}
               <div style={{ background: '#f8fafc', padding: '0.4rem 0.75rem', borderRadius: '6px', border: '1px solid var(--cpet-border)', textAlign: 'center' }}>
                 <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>Syllabus</span>
                 <strong style={{ fontSize: '1rem', color: '#334155' }}>{selectedCourse.total_planned_classes || 0} Classes</strong>
@@ -766,7 +798,13 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
               </div>
             ) : (
               filteredStudents.map(student => {
-                const isFeePaid = student.fee_status === 'PAID_TO_RP' || student.fee_status === 'OFFICE_CONFIRMED';
+                const amtPaid = Number(student.amount_paid) || 0;
+                const courseFee = Number(selectedCourse.standard_fee) || 0;
+                const remainingDue = Math.max(0, courseFee - amtPaid);
+                const isStudentFree = isFreeCourse || student.fee_status === 'FREE';
+                const isFullyPaid = isStudentFree || amtPaid >= courseFee || student.fee_status === 'PAID_TO_RP' || student.fee_status === 'OFFICE_CONFIRMED';
+                const isPartial = !isStudentFree && !isFullyPaid && amtPaid > 0;
+                const isEditingThis = editingFeeStudentId === student.id;
                 const gradedCount = Object.keys(student.marks || {}).length;
                 const totalSubjects = selectedCourse.subjects?.length || 0;
 
@@ -779,9 +817,23 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
                           📱 {student.account_phone} | Adm: <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{student.admission_number}</span>
                         </p>
                       </div>
-                      <span className={`badge ${isFeePaid ? 'badge-success' : 'badge-warning'}`}>
-                        {student.fee_status?.replace(/_/g, ' ')}
-                      </span>
+                      <div>
+                        {isStudentFree ? (
+                          <span className="badge badge-success">Free Course</span>
+                        ) : isFullyPaid ? (
+                          <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <CheckCircle size={11} /> Paid: ₹{amtPaid || courseFee}
+                          </span>
+                        ) : isPartial ? (
+                          <span className="badge badge-warning" style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <Clock size={11} /> Partial: ₹{amtPaid} / ₹{courseFee} (Due: ₹{remainingDue})
+                          </span>
+                        ) : (
+                          <span className="badge badge-danger" style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' }}>
+                            Due: ₹{courseFee}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Academic & Attendance Quick Status */}
@@ -802,15 +854,108 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
                       </div>
                     </div>
 
-                    {/* Fee Collection Action (if unpaid) */}
-                    {!isFeePaid && (
+                    {/* Fee Payment & Ledger Action */}
+                    {!isStudentFree && (
                       <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9' }}>
-                        <button
-                          className="btn btn-primary btn-sm btn-block"
-                          onClick={() => updateStudentFee(student.id, 'PAID_TO_RP', selectedCourse.standard_fee)}
-                        >
-                          <DollarSign size={13} /> Collect Fee (₹{selectedCourse.standard_fee})
-                        </button>
+                        {isEditingThis ? (
+                          <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                                Enter Amount Paid (Fee: ₹{courseFee}):
+                              </span>
+                              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                Balance Due: <strong style={{ color: '#dc2626' }}>₹{Math.max(0, courseFee - (Number(editingFeeAmount) || 0))}</strong>
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '8px' }}>
+                              <div style={{ position: 'relative', flex: 1 }}>
+                                <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: '#64748b', fontSize: '0.85rem' }}>₹</span>
+                                <input
+                                  type="number"
+                                  className="form-input"
+                                  style={{ paddingLeft: '1.5rem', fontSize: '0.85rem', fontWeight: 700, height: '34px' }}
+                                  value={editingFeeAmount}
+                                  onChange={e => setEditingFeeAmount(e.target.value)}
+                                  placeholder="Enter amount..."
+                                  min="0"
+                                  autoFocus
+                                />
+                              </div>
+
+                              <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                style={{ height: '34px', padding: '0 0.8rem', fontSize: '0.78rem' }}
+                                onClick={() => handleSaveFee(student.id)}
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                style={{ height: '34px', padding: '0 0.6rem', fontSize: '0.78rem' }}
+                                onClick={() => setEditingFeeStudentId(null)}
+                              >
+                                ✕
+                              </button>
+                            </div>
+
+                            {/* Quick Fill Chips */}
+                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                className="btn btn-sm"
+                                style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', fontSize: '0.7rem', padding: '2px 8px' }}
+                                onClick={() => setEditingFeeAmount(String(courseFee))}
+                              >
+                                Full: ₹{courseFee}
+                              </button>
+                              {courseFee >= 100 && (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm"
+                                  style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', fontSize: '0.7rem', padding: '2px 8px' }}
+                                  onClick={() => setEditingFeeAmount(String(Math.round(courseFee / 2)))}
+                                >
+                                  Half: ₹{Math.round(courseFee / 2)}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="btn btn-sm"
+                                style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', fontSize: '0.7rem', padding: '2px 8px' }}
+                                onClick={() => setEditingFeeAmount('0')}
+                              >
+                                Clear (₹0)
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ fontSize: '0.78rem' }}>
+                              <span style={{ color: '#64748b' }}>Paid: </span>
+                              <strong style={{ color: isFullyPaid ? '#16a34a' : amtPaid > 0 ? '#b45309' : '#dc2626' }}>
+                                ₹{amtPaid.toLocaleString('en-IN')}
+                              </strong>
+                              {remainingDue > 0 && (
+                                <span style={{ color: '#dc2626', marginLeft: '6px', fontSize: '0.72rem' }}>
+                                  (Due: ₹{remainingDue.toLocaleString('en-IN')})
+                                </span>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              className={`btn btn-sm ${isFullyPaid ? 'btn-secondary' : 'btn-primary'}`}
+                              style={{ fontSize: '0.72rem', padding: '3px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              onClick={() => startEditingFee(student)}
+                            >
+                              <DollarSign size={12} />
+                              {isFullyPaid ? 'Edit Payment' : amtPaid > 0 ? 'Update Payment' : `Collect Fee (₹${courseFee})`}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

@@ -1,13 +1,34 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { CreditCard, Plus, CheckCircle, Clock, ArrowUpRight, DollarSign } from 'lucide-react';
+import { CreditCard, Plus, CheckCircle, Clock, ArrowUpRight, DollarSign, TrendingUp, AlertCircle, Wallet } from 'lucide-react';
 
 export const RPFeeRemittance = () => {
   const { currentRp, centres, courses, remittances, addRemittance, enrollments, showToast } = useApp();
   const [showModal, setShowModal] = useState(false);
 
   const assignedCentres = centres.filter(c => c.assigned_rp_id === currentRp.id);
+  const assignedCentreIds = new Set(assignedCentres.map(c => c.id));
   const rpRemittances = remittances.filter(r => r.rp_id === currentRp.id);
+
+  // Enrollments belonging to this RP's centres (or Mahallu centres assigned)
+  const rpEnrollments = enrollments.filter(e => e.centre_id && assignedCentreIds.has(e.centre_id));
+
+  // 1. Total actual money collected by RP from students (Credited)
+  const totalStudentFeesCredited = rpEnrollments.reduce((sum, e) => sum + (Number(e.amount_paid) || 0), 0);
+
+  // 2. Total remittances submitted by RP to CPET office
+  const totalRemittedToOffice = rpRemittances.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+  const confirmedRemittedToOffice = rpRemittances.filter(r => r.status === 'CONFIRMED_BY_OFFICE').reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
+  // 3. Unremitted cash in RP's hand
+  const unremittedInHand = Math.max(0, totalStudentFeesCredited - totalRemittedToOffice);
+
+  // 4. Expected revenue and student dues
+  const totalExpectedRevenue = rpEnrollments.reduce((sum, e) => {
+    const c = courses.find(crs => crs.id === e.course_id);
+    return sum + (Number(c?.standard_fee) || 0);
+  }, 0);
+  const totalStudentDues = Math.max(0, totalExpectedRevenue - totalStudentFeesCredited);
 
   // Form State
   const initialCourseId = courses[0]?.id || '';
@@ -41,6 +62,13 @@ export const RPFeeRemittance = () => {
     }));
   };
 
+  const handleOpenRemitModal = (prefillAmount) => {
+    if (prefillAmount && prefillAmount > 0) {
+      setFormData(prev => ({ ...prev, amount: String(prefillAmount) }));
+    }
+    setShowModal(true);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.amount || !formData.transaction_ref) {
@@ -61,22 +89,94 @@ export const RPFeeRemittance = () => {
     });
   };
 
+  // Specific centre calculation inside modal
+  const selectedCentreEnrollments = rpEnrollments.filter(e => 
+    (!formData.centre_id || e.centre_id === formData.centre_id) && 
+    (!formData.course_id || e.course_id === formData.course_id)
+  );
+  const selectedCentreCollected = selectedCentreEnrollments.reduce((sum, e) => sum + (Number(e.amount_paid) || 0), 0);
+  const selectedCentreRemitted = rpRemittances
+    .filter(r => (!formData.centre_id || r.centre_id === formData.centre_id) && (!formData.course_id || r.course_id === formData.course_id))
+    .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+  const selectedCentreBalance = Math.max(0, selectedCentreCollected - selectedCentreRemitted);
+
   return (
     <div>
       <div className="cpet-card-header">
         <div>
           <h3 className="cpet-card-title">
             <CreditCard size={20} />
-            Fee Remittance to CPET Office
+            Fee Remittance & Financial Ledger
           </h3>
           <p className="cpet-card-desc">
             Submit course fees collected from students to the central office account with your bank UTR or receipt.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+        <button className="btn btn-primary" onClick={() => handleOpenRemitModal(unremittedInHand > 0 ? unremittedInHand : null)}>
           <Plus size={16} />
           Submit Fee Remittance
         </button>
+      </div>
+
+      {/* Live Financial Reconciliation KPIs */}
+      <div className="stats-grid" style={{ marginBottom: '1.25rem' }}>
+        <div className="stat-card">
+          <div className="stat-info">
+            <p>Fees Collected from Students</p>
+            <h3 style={{ color: '#16a34a' }}>₹{totalStudentFeesCredited.toLocaleString('en-IN')}</h3>
+            <span>Marked as paid across {rpEnrollments.filter(e => (Number(e.amount_paid) || 0) > 0).length} students</span>
+          </div>
+          <div className="stat-icon" style={{ background: '#dcfce7', color: '#16a34a' }}>
+            <TrendingUp size={22} />
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-info">
+            <p>Remitted to CPET Office</p>
+            <h3 style={{ color: 'var(--cpet-primary)' }}>₹{totalRemittedToOffice.toLocaleString('en-IN')}</h3>
+            <span>Confirmed: ₹{confirmedRemittedToOffice.toLocaleString('en-IN')}</span>
+          </div>
+          <div className="stat-icon" style={{ background: 'var(--cpet-accent-soft)', color: 'var(--cpet-accent)' }}>
+            <CheckCircle size={22} />
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-info">
+            <p>Unremitted Cash in Hand</p>
+            <h3 style={{ color: unremittedInHand > 0 ? '#b45309' : '#16a34a' }}>
+              ₹{unremittedInHand.toLocaleString('en-IN')}
+            </h3>
+            <span>
+              {unremittedInHand > 0 ? (
+                <button
+                  type="button"
+                  style={{ background: 'none', border: 'none', color: '#b45309', fontWeight: 700, padding: 0, cursor: 'pointer', textDecoration: 'underline', fontSize: '0.72rem' }}
+                  onClick={() => handleOpenRemitModal(unremittedInHand)}
+                >
+                  Click to Remit to Office →
+                </button>
+              ) : 'All collections remitted ✓'}
+            </span>
+          </div>
+          <div className="stat-icon" style={{ background: unremittedInHand > 0 ? '#fef3c7' : '#f8fafc', color: unremittedInHand > 0 ? '#b45309' : '#64748b' }}>
+            <Wallet size={22} />
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-info">
+            <p>Student Dues Outstanding</p>
+            <h3 style={{ color: totalStudentDues > 0 ? '#dc2626' : '#16a34a' }}>
+              ₹{totalStudentDues.toLocaleString('en-IN')}
+            </h3>
+            <span>Uncollected student fees</span>
+          </div>
+          <div className="stat-icon" style={{ background: totalStudentDues > 0 ? '#fee2e2' : '#f8fafc', color: totalStudentDues > 0 ? '#dc2626' : '#16a34a' }}>
+            <AlertCircle size={22} />
+          </div>
+        </div>
       </div>
 
       {/* Remittances History (Mobile Optimized) */}
@@ -170,7 +270,19 @@ export const RPFeeRemittance = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Total Amount (₹) <span className="required">*</span></label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label className="form-label" style={{ margin: 0 }}>Total Amount (₹) <span className="required">*</span></label>
+                      {selectedCentreBalance > 0 && (
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', fontSize: '0.68rem', padding: '1px 6px', fontWeight: 700 }}
+                          onClick={() => setFormData(prev => ({ ...prev, amount: String(selectedCentreBalance) }))}
+                        >
+                          Fill In-Hand: ₹{selectedCentreBalance}
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="number"
                       className="form-input"
@@ -179,6 +291,9 @@ export const RPFeeRemittance = () => {
                       value={formData.amount}
                       onChange={e => setFormData({ ...formData, amount: e.target.value })}
                     />
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>
+                      Collected here: <strong>₹{selectedCentreCollected}</strong> | Remitted: <strong>₹{selectedCentreRemitted}</strong>
+                    </div>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Students Covered</label>

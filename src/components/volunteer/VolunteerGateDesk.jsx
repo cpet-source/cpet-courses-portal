@@ -608,9 +608,13 @@ export const VolunteerGateDesk = ({ onExit }) => {
                       <span className="badge badge-neutral" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
                         Free
                       </span>
-                    ) : isFeePaid ? (
+                    ) : (Number(applicant.amount_paid) || 0) >= standardFee || applicant.fee_status === 'OFFICE_CONFIRMED' || applicant.fee_status === 'PAID_ON_SPOT' || applicant.fee_status === 'PAID_TO_RP' ? (
                       <span className="badge badge-success" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
                         ✓ Paid ₹{applicant.amount_paid || standardFee}
+                      </span>
+                    ) : (Number(applicant.amount_paid) || 0) > 0 ? (
+                      <span className="badge badge-warning" style={{ fontSize: '0.68rem', padding: '2px 6px', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
+                        ₹{applicant.amount_paid} Paid (Due ₹{Math.max(0, standardFee - (Number(applicant.amount_paid) || 0))})
                       </span>
                     ) : (
                       <span className="badge badge-warning" style={{ fontSize: '0.68rem', padding: '2px 6px', background: '#fef3c7', color: '#92400e' }}>

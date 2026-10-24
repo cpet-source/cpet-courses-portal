@@ -1600,20 +1600,64 @@ export const AppProvider = ({ children }) => {
     showToast('Marks updated successfully.');
   };
 
-  const updateStudentFee = (enrollmentId, feeStatus, amountPaid) => {
+  const updateStudentFee = (enrollmentId, feeStatusOrAmount, optionalAmountPaid) => {
+    let message = 'Student fee record updated.';
     setEnrollments(prev => prev.map(enr => {
       if (enr.id === enrollmentId) {
+        const course = courses.find(c => c.id === enr.course_id);
+        const standardFee = Number(course?.standard_fee) || 0;
+        
+        let newAmount = Number(enr.amount_paid) || 0;
+        let newStatus = enr.fee_status || 'PENDING';
+
+        // If called with numeric amount: updateStudentFee(enrId, 1500)
+        if (typeof feeStatusOrAmount === 'number' || (!isNaN(Number(feeStatusOrAmount)) && optionalAmountPaid === undefined)) {
+          newAmount = Math.max(0, Number(feeStatusOrAmount) || 0);
+          if (standardFee === 0 || course?.payment_policy === 'FREE_COURSE') {
+            newStatus = 'FREE';
+            message = `Student fee marked Free for ${enr.student_name}.`;
+          } else if (newAmount >= standardFee) {
+            newStatus = 'PAID_TO_RP';
+            message = `Full fee of ₹${newAmount.toLocaleString('en-IN')} marked as paid for ${enr.student_name}!`;
+          } else if (newAmount > 0) {
+            newStatus = 'PARTIAL_PAID';
+            message = `Partial payment of ₹${newAmount.toLocaleString('en-IN')} recorded (Due: ₹${(standardFee - newAmount).toLocaleString('en-IN')}) for ${enr.student_name}.`;
+          } else {
+            newStatus = 'PENDING';
+            message = `Fee reset to Due (₹${standardFee.toLocaleString('en-IN')}) for ${enr.student_name}.`;
+          }
+        } 
+        // If called with explicit status string: updateStudentFee(enrId, 'PAID_TO_RP', 3000)
+        else {
+          newStatus = feeStatusOrAmount || enr.fee_status;
+          if (optionalAmountPaid !== undefined) {
+            newAmount = Math.max(0, Number(optionalAmountPaid) || 0);
+          } else if (newStatus === 'PAID_TO_RP' || newStatus === 'OFFICE_CONFIRMED' || newStatus === 'PAID_ON_SPOT') {
+            newAmount = standardFee;
+          } else if (newStatus === 'PENDING') {
+            newAmount = 0;
+          }
+
+          if (standardFee > 0 && newStatus !== 'FREE') {
+            if (newAmount >= standardFee && (newStatus === 'PARTIAL_PAID' || newStatus === 'PENDING')) {
+              newStatus = 'PAID_TO_RP';
+            } else if (newAmount > 0 && newAmount < standardFee) {
+              newStatus = 'PARTIAL_PAID';
+            }
+          }
+        }
+
         const updated = {
           ...enr,
-          fee_status: feeStatus,
-          amount_paid: amountPaid !== undefined ? Number(amountPaid) : enr.amount_paid
+          fee_status: newStatus,
+          amount_paid: newAmount
         };
         syncToCloud('Enrollment', updated);
         return updated;
       }
       return enr;
     }));
-    showToast('Student fee record updated.');
+    showToast(message);
   };
 
   const markStudentAttendance = (enrollmentId) => {

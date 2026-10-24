@@ -61,8 +61,7 @@ export const StudentBulkImporterModal = ({
     genderColumn: '',
     placeColumn: '',
     districtColumn: '',
-    dobColumn: '',
-    amountPaidColumn: ''
+    dobColumn: ''
   });
 
   // 4. Execution State
@@ -190,7 +189,6 @@ export const StudentBulkImporterModal = ({
     const placeCol = findMatch(/^(place|city|location|address|സ്ഥലം)$/i) || findMatch(/place|city|സ്ഥലം/i);
     const districtCol = findMatch(/^(district|ജില്ല)$/i) || findMatch(/district|ജില്ല/i);
     const dobCol = findMatch(/^(dob|date[_\s]?of[_\s]?birth|birth[_\s]?date|age|പ്രായം)$/i) || findMatch(/birth|dob|age/i);
-    const feeCol = findMatch(/^(amount|fee|fees|paid|transaction|utr)$/i) || findMatch(/amount|fee/i);
 
     setFieldMapping({
       nameColumn: nameCol || headers[0] || '',
@@ -198,8 +196,7 @@ export const StudentBulkImporterModal = ({
       genderColumn: genderCol || '',
       placeColumn: placeCol || '',
       districtColumn: districtCol || '',
-      dobColumn: dobCol || '',
-      amountPaidColumn: feeCol || ''
+      dobColumn: dobCol || ''
     });
   };
 
@@ -222,7 +219,6 @@ export const StudentBulkImporterModal = ({
       const rawPlace = fieldMapping.placeColumn ? row[fieldMapping.placeColumn] : '';
       const rawDistrict = fieldMapping.districtColumn ? row[fieldMapping.districtColumn] : '';
       const rawDob = fieldMapping.dobColumn ? row[fieldMapping.dobColumn] : '';
-      const rawAmount = fieldMapping.amountPaidColumn ? row[fieldMapping.amountPaidColumn] : '';
 
       const name = String(rawName || '').trim();
       const cleanPhone = String(rawPhone || '').replace(/\D/g, '').slice(-10);
@@ -251,6 +247,10 @@ export const StudentBulkImporterModal = ({
         issueMessage = 'Duplicate phone number in this file';
       }
 
+      const isFreeCourse = activeCourse?.payment_policy === 'FREE_COURSE' || (activeCourse?.standard_fee || 0) === 0;
+      const initialFeeStatus = isFreeCourse || defaultFeeStatus === 'FREE' ? 'FREE' : defaultFeeStatus;
+      const initialAmountPaid = initialFeeStatus === 'OFFICE_CONFIRMED' ? (activeCourse?.standard_fee || 0) : 0;
+
       return {
         originalIndex: index + 1,
         full_name: name || `Student #${index + 1}`,
@@ -259,7 +259,8 @@ export const StudentBulkImporterModal = ({
         place: rawPlace || '',
         district: rawDistrict || 'Malappuram',
         date_of_birth: rawDob || '',
-        amount_paid: Number(rawAmount) || (defaultFeeStatus === 'OFFICE_CONFIRMED' ? (activeCourse?.standard_fee || 0) : 0),
+        fee_status: initialFeeStatus,
+        amount_paid: initialAmountPaid,
         status,
         issueMessage,
         raw: row
@@ -589,23 +590,6 @@ export const StudentBulkImporterModal = ({
                       onChange={e => setFieldMapping({ ...fieldMapping, genderColumn: e.target.value })}
                     >
                       <option value="">-- None (Default: MALE) --</option>
-                      {rawHeaders.map(h => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.78rem' }}>
-                      Amount Paid (Optional)
-                    </label>
-                    <select
-                      className="form-select"
-                      style={{ fontSize: '0.82rem' }}
-                      value={fieldMapping.amountPaidColumn}
-                      onChange={e => setFieldMapping({ ...fieldMapping, amountPaidColumn: e.target.value })}
-                    >
-                      <option value="">-- Standard Course Fee --</option>
                       {rawHeaders.map(h => (
                         <option key={h} value={h}>{h}</option>
                       ))}

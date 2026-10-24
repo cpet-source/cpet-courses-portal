@@ -1092,11 +1092,15 @@ export const CoursesManager = () => {
                 <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Fee Status Breakdown</span>
                 <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>
                   <span style={{ color: '#16a34a' }}>
-                    {modalFilteredStudents.filter(e => e.fee_status === 'PAID_TO_RP' || e.fee_status === 'OFFICE_CONFIRMED' || e.fee_status === 'FREE').length} Paid
+                    {modalFilteredStudents.filter(e => e.fee_status === 'FREE' || e.fee_status === 'PAID_TO_RP' || e.fee_status === 'OFFICE_CONFIRMED' || (Number(e.amount_paid) >= (currentModalCourse?.standard_fee || 0) && (currentModalCourse?.standard_fee || 0) > 0)).length} Paid
+                  </span>
+                  {' • '}
+                  <span style={{ color: '#b45309' }}>
+                    {modalFilteredStudents.filter(e => e.fee_status === 'PARTIAL_PAID' || ((Number(e.amount_paid) || 0) > 0 && (Number(e.amount_paid) || 0) < (currentModalCourse?.standard_fee || 0))).length} Partial
                   </span>
                   {' • '}
                   <span style={{ color: '#dc2626' }}>
-                    {modalFilteredStudents.filter(e => e.fee_status !== 'PAID_TO_RP' && e.fee_status !== 'OFFICE_CONFIRMED' && e.fee_status !== 'FREE').length} Due
+                    {modalFilteredStudents.filter(e => e.fee_status !== 'FREE' && (Number(e.amount_paid) || 0) === 0).length} Due
                   </span>
                 </span>
               </div>
@@ -1298,7 +1302,11 @@ export const CoursesManager = () => {
                     </thead>
                     <tbody>
                       {modalFilteredStudents.map((enr, idx) => {
-                        const isPaid = enr.fee_status === 'PAID_TO_RP' || enr.fee_status === 'OFFICE_CONFIRMED' || enr.fee_status === 'FREE';
+                        const std = Number(currentModalCourse?.standard_fee) || 0;
+                        const amt = Number(enr.amount_paid) || 0;
+                        const isFree = enr.fee_status === 'FREE' || std === 0;
+                        const isFull = !isFree && (amt >= std || enr.fee_status === 'PAID_TO_RP' || enr.fee_status === 'OFFICE_CONFIRMED' || enr.fee_status === 'PAID_ON_SPOT');
+                        const isPartial = !isFree && !isFull && amt > 0;
 
                         return (
                           <tr key={enr.id || idx}>
@@ -1332,12 +1340,19 @@ export const CoursesManager = () => {
                               </span>
                             </td>
                             <td>
-                              <span
-                                className={`badge ${isPaid ? 'badge-success' : 'badge-danger'}`}
-                                style={{ fontSize: '0.72rem' }}
-                              >
-                                {isPaid ? `Paid (₹${enr.amount_paid || currentModalCourse?.standard_fee || 0})` : 'Pending'}
-                              </span>
+                              {isFree ? (
+                                <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>Free</span>
+                              ) : isFull ? (
+                                <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>Paid (₹{amt || std})</span>
+                              ) : isPartial ? (
+                                <span className="badge badge-warning" style={{ fontSize: '0.72rem', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
+                                  Partial: ₹{amt} (Due: ₹{Math.max(0, std - amt)})
+                                </span>
+                              ) : (
+                                <span className="badge badge-danger" style={{ fontSize: '0.72rem', background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' }}>
+                                  Due: ₹{std}
+                                </span>
+                              )}
                             </td>
                             <td style={{ color: '#64748b', fontSize: '0.75rem' }}>
                               {enr.enrollment_date || 'N/A'}

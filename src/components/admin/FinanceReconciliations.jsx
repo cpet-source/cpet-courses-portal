@@ -119,9 +119,9 @@ export const FinanceReconciliations = () => {
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-info">
-            <p>Total Student Fees Collected</p>
-            <h3>₹{totalCollectedFromStudents.toLocaleString('en-IN')}</h3>
-            <span>Across all {totalEnrolled} enrollments</span>
+            <p>Student Fees Credited (Collected)</p>
+            <h3 style={{ color: '#16a34a' }}>₹{totalCollectedFromStudents.toLocaleString('en-IN')}</h3>
+            <span>Marked payments across {enrollments.filter(e => (e.amount_paid || 0) > 0).length} students</span>
           </div>
           <div className="stat-icon" style={{ background: 'var(--cpet-success-soft)', color: 'var(--cpet-success)' }}>
             <TrendingUp size={22} />
@@ -152,11 +152,11 @@ export const FinanceReconciliations = () => {
 
         <div className="stat-card">
           <div className="stat-info">
-            <p>Uncollected / Dues</p>
-            <h3>₹{(totalCollectibleFees - totalCollectedFromStudents).toLocaleString('en-IN')}</h3>
-            <span>Remaining course balances</span>
+            <p>Student Dues Outstanding</p>
+            <h3 style={{ color: '#dc2626' }}>₹{(totalCollectibleFees - totalCollectedFromStudents).toLocaleString('en-IN')}</h3>
+            <span>Uncollected student balances</span>
           </div>
-          <div className="stat-icon" style={{ background: '#f1f5f9', color: '#64748b' }}>
+          <div className="stat-icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
             <AlertCircle size={22} />
           </div>
         </div>

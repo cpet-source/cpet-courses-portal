@@ -439,7 +439,12 @@ export const StudentHub = () => {
                           memberEnrollments.map(enr => {
                             const targetCourse = courses.find(c => c.id === enr.course_id);
                             const hasMarks = Object.keys(enr.marks || {}).length > 0;
-                            const isPaid = enr.fee_status === 'OFFICE_CONFIRMED' || enr.fee_status === 'PAID_TO_RP' || enr.fee_status === 'PAID_ON_SPOT' || enr.fee_status === 'FREE';
+                            const stdFee = Number(targetCourse?.standard_fee) || 0;
+                            const amtPaid = Number(enr.amount_paid) || 0;
+                            const isFree = enr.fee_status === 'FREE' || stdFee === 0 || targetCourse?.payment_policy === 'FREE_COURSE';
+                            const isPaidFull = !isFree && (amtPaid >= stdFee || enr.fee_status === 'OFFICE_CONFIRMED' || enr.fee_status === 'PAID_TO_RP' || enr.fee_status === 'PAID_ON_SPOT');
+                            const isPartial = !isFree && !isPaidFull && amtPaid > 0;
+                            const remainingDue = Math.max(0, stdFee - amtPaid);
 
                             return (
                               <div key={enr.id} className="mobile-data-card" style={{ padding: '1.25rem' }}>
@@ -462,9 +467,19 @@ export const StudentHub = () => {
                                   <span className={`badge ${enr.completion_status === 'COMPLETED' ? 'badge-success' : 'badge-primary'}`}>
                                     {enr.completion_status.replace(/_/g, ' ')}
                                   </span>
-                                  <span className={`badge ${isPaid ? 'badge-success' : 'badge-warning'}`}>
-                                    Fee: {enr.fee_status.replace(/_/g, ' ')}
-                                  </span>
+                                  {isFree ? (
+                                    <span className="badge badge-success">Free Course</span>
+                                  ) : isPaidFull ? (
+                                    <span className="badge badge-success">Fee: Paid (₹{amtPaid || stdFee})</span>
+                                  ) : isPartial ? (
+                                    <span className="badge badge-warning" style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
+                                      Fee: ₹{amtPaid} Paid (Due: ₹{remainingDue})
+                                    </span>
+                                  ) : (
+                                    <span className="badge badge-danger" style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' }}>
+                                      Fee: Due (₹{stdFee})
+                                    </span>
+                                  )}
                                 </div>
 
                                 {/* Academic Attendance / Marks Grid */}
