@@ -20,6 +20,32 @@ function getSanitizedMongoUri() {
     }
   }
 
+  // Automatically URL-encode credentials if username or password contain unescaped characters
+  try {
+    const schemeMatch = uri.match(/^(mongodb(?:\+srv)?:\/\/)/i);
+    if (schemeMatch) {
+      const scheme = schemeMatch[0];
+      const afterScheme = uri.slice(scheme.length);
+      const lastAt = afterScheme.lastIndexOf('@');
+      if (lastAt !== -1) {
+        const auth = afterScheme.slice(0, lastAt);
+        const rest = afterScheme.slice(lastAt + 1);
+        const colonIdx = auth.indexOf(':');
+        if (colonIdx !== -1) {
+          const rawUser = auth.slice(0, colonIdx);
+          const rawPass = auth.slice(colonIdx + 1);
+          let user = rawUser;
+          let pass = rawPass;
+          try { user = decodeURIComponent(rawUser); } catch (_) {}
+          try { pass = decodeURIComponent(rawPass); } catch (_) {}
+          uri = scheme + encodeURIComponent(user) + ':' + encodeURIComponent(pass) + '@' + rest;
+        }
+      }
+    }
+  } catch (encodeErr) {
+    console.warn('Could not auto-encode MongoDB URI credentials:', encodeErr?.message);
+  }
+
   return uri;
 }
 
