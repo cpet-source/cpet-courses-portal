@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   initialCourses,
   initialCentres,
@@ -80,6 +80,7 @@ export const AppProvider = ({ children }) => {
 
   const [isCloudConnected, setIsCloudConnected] = useState(false);
   const [cloudError, setCloudError] = useState(null);
+  const lastCloudUpdatedAtRef = useRef(0);
 
   // Offline Sync State
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
@@ -144,6 +145,7 @@ export const AppProvider = ({ children }) => {
       if (data && data.success) {
         setIsCloudConnected(true);
         setCloudError(null);
+        lastCloudUpdatedAtRef.current = Date.now();
         return true;
       } else {
         if (data?.error) {
@@ -374,12 +376,29 @@ export const AppProvider = ({ children }) => {
     setClassLogs(d.classLogs || []);
     setRemittances(d.remittances || []);
     setPayouts(d.payouts || []);
+    if (res.last_updated_at) {
+      lastCloudUpdatedAtRef.current = Number(res.last_updated_at);
+    }
     return true;
   };
 
-  // Live sync from MongoDB Atlas
-  const fetchLatestFromCloud = async () => {
+  // Live sync from MongoDB Atlas with bandwidth-saving smart check
+  const fetchLatestFromCloud = async (forceFull = false) => {
     try {
+      // 1. Lightweight check: ask if anything updated in the cloud since our last sync (transfers only ~40 bytes)
+      if (!forceFull && lastCloudUpdatedAtRef.current > 0) {
+        const checkRes = await fetch(`/api/data?check=1&since=${lastCloudUpdatedAtRef.current}`);
+        const checkData = await checkRes.json();
+        if (checkData && checkData.connected) {
+          if (checkData.changed === false) {
+            // Nothing changed in MongoDB! Zero origin transfer consumed.
+            setIsCloudConnected(true);
+            return true;
+          }
+        }
+      }
+
+      // 2. Fetch full payload only when data has genuinely changed or on initial load
       const r = await fetch('/api/data');
       const res = await r.json();
       if (res && res.connected && res.data) {
@@ -421,7 +440,7 @@ export const AppProvider = ({ children }) => {
     const handleOnline = () => {
       setIsOnline(true);
       flushOfflineSyncQueue();
-      fetchLatestFromCloud();
+      fetchLatestFromCloud(true);
     };
 
     const handleOffline = () => {
@@ -437,8 +456,8 @@ export const AppProvider = ({ children }) => {
       flushOfflineSyncQueue();
     }
 
-    // Auto-refresh every 12 seconds to pick up updates from other devices
-    const interval = setInterval(fetchLatestFromCloud, 12000);
+    // Auto-refresh every 45 seconds using ultra-lightweight check
+    const interval = setInterval(fetchLatestFromCloud, 45000);
 
     return () => {
       window.removeEventListener('focus', onFocus);

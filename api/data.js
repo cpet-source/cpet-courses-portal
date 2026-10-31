@@ -67,6 +67,22 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
+      const metaUpdate = await SystemMeta.findOne({ key: 'last_updated_at' }).lean();
+      const lastUpdatedAt = metaUpdate?.value ? Number(metaUpdate.value) : 0;
+      const since = Number(req.query?.since || 0);
+
+      // Lightweight polling check: If client checks if data changed and nothing did, return tiny response!
+      if (req.query?.check === '1') {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        if (since > 0 && lastUpdatedAt <= since) {
+          return res.status(200).json({
+            connected: true,
+            changed: false,
+            last_updated_at: lastUpdatedAt
+          });
+        }
+      }
+
       const [courses, centres, rps, students, enrollments, classLogs, remittances, payouts, metaWipe] = await Promise.all([
         Course.find({}).lean(),
         Centre.find({}).lean(),
@@ -79,8 +95,12 @@ export default async function handler(req, res) {
         SystemMeta.findOne({ key: 'last_wiped_at' }).lean()
       ]);
 
+      res.setHeader('Cache-Control', 'public, s-maxage=5, stale-while-revalidate=15');
+
       return res.status(200).json({
         connected: true,
+        changed: true,
+        last_updated_at: lastUpdatedAt,
         last_wiped_at: metaWipe?.value ? Number(metaWipe.value) : 0,
         data: {
           courses,
@@ -97,6 +117,20 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const { type, payload } = req.body || {};
+      const now = Date.now();
+
+      // Helper to bump the database update timestamp
+      const touchUpdatedAt = async () => {
+        try {
+          await SystemMeta.findOneAndUpdate(
+            { key: 'last_updated_at' },
+            { key: 'last_updated_at', value: now },
+            { upsert: true, new: true }
+          );
+        } catch (e) {
+          console.warn('Could not update last_updated_at:', e.message);
+        }
+      };
 
       if (type === 'CLEAR_ALL_DATA') {
         await Promise.all([
@@ -109,13 +143,13 @@ export default async function handler(req, res) {
           Remittance.deleteMany({}),
           Payout.deleteMany({})
         ]);
-        const now = Date.now();
         await SystemMeta.findOneAndUpdate(
           { key: 'last_wiped_at' },
           { key: 'last_wiped_at', value: now },
           { upsert: true, new: true }
         );
-        return res.status(200).json({ success: true, last_wiped_at: now, message: 'All database records cleared.' });
+        await touchUpdatedAt();
+        return res.status(200).json({ success: true, last_wiped_at: now, last_updated_at: now, message: 'All database records cleared.' });
       }
 
       if (type === 'SYNC_ALL') {
@@ -155,6 +189,7 @@ export default async function handler(req, res) {
           if (p.id) await Payout.findOneAndUpdate({ id: p.id }, p, { upsert: true, new: true });
         }
 
+        await touchUpdatedAt();
         return res.status(200).json({ success: true, message: 'All local records successfully synced to MongoDB Atlas.' });
       }
 
@@ -173,6 +208,7 @@ export default async function handler(req, res) {
         if (Model && item) {
           const filter = item.id ? { id: item.id } : { account_phone: item.account_phone };
           await Model.findOneAndUpdate(filter, item, { upsert: true, new: true });
+          await touchUpdatedAt();
           return res.status(200).json({ success: true });
         }
       }
@@ -191,6 +227,7 @@ export default async function handler(req, res) {
           }
         }
         await Promise.all(ops);
+        await touchUpdatedAt();
         return res.status(200).json({ success: true, count: enrollments.length });
       }
 
@@ -209,10 +246,12 @@ export default async function handler(req, res) {
         if (Model) {
           if (entityName === 'Enrollment' && account_phone && !id) {
             await Model.deleteMany({ account_phone });
+            await touchUpdatedAt();
             return res.status(200).json({ success: true, message: `All enrollments for ${account_phone} deleted.` });
           }
           const filter = id ? { id } : { account_phone };
           await Model.deleteOne(filter);
+          await touchUpdatedAt();
           return res.status(200).json({ success: true, message: `${entityName} deleted.` });
         }
       }
@@ -236,6 +275,7 @@ export default async function handler(req, res) {
             );
           }
         }
+        await touchUpdatedAt();
         return res.status(200).json({ success: true, message: 'Student records cascaded and erased.' });
       }
 
