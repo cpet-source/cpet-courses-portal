@@ -20,6 +20,11 @@ function getSanitizedMongoUri() {
     }
   }
 
+  // Auto-correct generic Atlas placeholder hostnames to the actual CPET production cluster
+  if (uri.includes('@cluster.mongodb.net') || uri.includes('@cluster0.mongodb.net')) {
+    uri = uri.replace(/@cluster0?\.mongodb\.net/i, '@cpet-portal.fw7o9tr.mongodb.net');
+  }
+
   // Automatically URL-encode credentials if username or password contain unescaped characters
   try {
     const schemeMatch = uri.match(/^(mongodb(?:\+srv)?:\/\/)/i);
