@@ -22,7 +22,7 @@ export const RPDashboard = () => {
   const { currentRp, centres, classLogs, payouts } = useApp();
   const [activeTab, setActiveTab] = useState('classes');
 
-  const assignedCentres = centres.filter(c => c.assigned_rp_id === currentRp.id);
+  const assignedCentres = centres.filter(c => c.founded_by_rp_id === currentRp.id || c.assigned_rp_id === currentRp.id);
   const rpLogs = classLogs.filter(l => l.rp_id === currentRp.id);
 
   // Financial statistics for current RP

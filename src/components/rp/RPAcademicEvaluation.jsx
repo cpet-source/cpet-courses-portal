@@ -39,8 +39,26 @@ export const RPAcademicEvaluation = () => {
 
   const rpOwnedCentres = centres.filter(isCentreOwnedByRP);
 
-  // 1. Course Selection (filtered by active vs concluded)
+  // Helper: Check if course is accessible to current RP
+  const isCourseAssignedToRP = (c) => {
+    if (!currentRp?.id) return false;
+    if (c.category === 'MAHALLU') {
+      return rpOwnedCentres.some(ctr => 
+        ctr.active_course_id === c.id || 
+        (Array.isArray(ctr.course_ids) && ctr.course_ids.includes(c.id)) ||
+        enrollments.some(e => e.course_id === c.id && e.centre_id === ctr.id)
+      );
+    } else {
+      // Non-Mahallu courses: ONLY accessible if Admin assigned this RP to the course or to a batch
+      const isCourseDirect = c.assigned_rp_id === currentRp.id;
+      const isBatchAssigned = Array.isArray(c.batches) && c.batches.some(b => b.assigned_rp_id === currentRp.id);
+      return isCourseDirect || isBatchAssigned;
+    }
+  };
+
+  // 1. Course Selection (filtered by active vs concluded and assigned to this RP)
   const baseCourses = courses.filter(c => {
+    if (!isCourseAssignedToRP(c)) return false;
     if (viewMode === 'ACTIVE') {
       return c.status !== 'COMPLETED';
     } else {
@@ -104,6 +122,12 @@ export const RPAcademicEvaluation = () => {
     if (selectedCourse?.category === 'MAHALLU') {
       return e.centre_id === selectedCentreId;
     } else {
+      // Non-Mahallu: must be assigned to this batch or direct course RP
+      const isCourseDirect = selectedCourse?.assigned_rp_id === currentRp?.id;
+      const b = (selectedCourse?.batches || []).find(item => item.id === e.batch_id || item.batch_name === e.batch_id);
+      const isBatchAssigned = isCourseDirect || b?.assigned_rp_id === currentRp?.id;
+      if (!isBatchAssigned) return false;
+
       if (!selectedBatchId || selectedBatchId === 'ALL') return true;
       return e.batch_id === selectedBatchId || e.batch_name === selectedBatchId;
     }
@@ -243,19 +267,25 @@ export const RPAcademicEvaluation = () => {
               <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
                 2. Select Intake Batch:
               </label>
-              <select
-                className="form-select"
-                value={selectedBatchId}
-                onChange={e => setSelectedBatchId(e.target.value)}
-                style={{ fontWeight: 700 }}
-              >
-                <option value="ALL">All Batches</option>
-                {(selectedCourse?.batches || []).map(b => (
-                  <option key={b.id} value={b.id}>
-                    {b.batch_name} [{b.status.replace(/_/g, ' ')}]
-                  </option>
-                ))}
-              </select>
+              {(() => {
+                const isCourseDirect = selectedCourse?.assigned_rp_id === currentRp?.id;
+                const rpBatches = (selectedCourse?.batches || []).filter(b => isCourseDirect || b.assigned_rp_id === currentRp?.id);
+                return (
+                  <select
+                    className="form-select"
+                    value={selectedBatchId}
+                    onChange={e => setSelectedBatchId(e.target.value)}
+                    style={{ fontWeight: 700 }}
+                  >
+                    <option value="ALL">All Assigned Batches</option>
+                    {rpBatches.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.batch_name} [{b.status.replace(/_/g, ' ')}]
+                      </option>
+                    ))}
+                  </select>
+                );
+              })()}
             </div>
           )}
 

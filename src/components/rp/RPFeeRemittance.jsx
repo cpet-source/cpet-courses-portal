@@ -36,8 +36,16 @@ export const RPFeeRemittance = () => {
   }, 0);
   const totalStudentDues = Math.max(0, totalExpectedRevenue - totalStudentFeesCredited);
 
-  // Form State (Centres scoped strictly to this RP)
-  const initialCourseId = courses[0]?.id || '';
+  // Form State (Courses & Centres scoped strictly to this RP)
+  const rpAvailableCourses = courses.filter(c => {
+    if (c.category === 'MAHALLU') {
+      return rpCentres.some(ctr => ctr.active_course_id === c.id || (Array.isArray(ctr.course_ids) && ctr.course_ids.includes(c.id)));
+    } else {
+      return c.assigned_rp_id === currentRp?.id || (Array.isArray(c.batches) && c.batches.some(b => b.assigned_rp_id === currentRp?.id));
+    }
+  });
+
+  const initialCourseId = rpAvailableCourses[0]?.id || '';
   const initialCentresForCourse = rpCentres.filter(c => 
     !initialCourseId || c.active_course_id === initialCourseId || (c.course_ids && c.course_ids.includes(initialCourseId))
   );
@@ -241,27 +249,27 @@ export const RPFeeRemittance = () => {
                     value={formData.course_id}
                     onChange={e => handleCourseChange(e.target.value)}
                   >
-                    {courses.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.title} ({c.course_code})
-                      </option>
-                    ))}
+                    {rpAvailableCourses.length === 0 ? (
+                      <option value="">-- No courses assigned to your account --</option>
+                    ) : (
+                      rpAvailableCourses.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.title} ({c.course_code})
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Mahallu Study Centre <span className="required">*</span></label>
+                  <label className="form-label">Study Centre <span className="required">*</span></label>
                   <select
                     className="form-select"
                     value={formData.centre_id}
                     onChange={e => setFormData({ ...formData, centre_id: e.target.value })}
                   >
                     {availableCentres.length === 0 ? (
-                      centres.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.centre_name} ({c.place})
-                        </option>
-                      ))
+                      <option value="">-- No study centres registered under your account --</option>
                     ) : (
                       availableCentres.map(c => (
                         <option key={c.id} value={c.id}>

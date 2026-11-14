@@ -44,8 +44,26 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
   // Centres owned by this RP
   const rpOwnedCentres = centres.filter(isCentreOwnedByRP);
 
+  // Helper: Check if course is accessible to current RP
+  const isCourseAssignedToRP = (c) => {
+    if (!currentRp?.id) return false;
+    if (c.category === 'MAHALLU') {
+      return rpOwnedCentres.some(ctr => 
+        ctr.active_course_id === c.id || 
+        (Array.isArray(ctr.course_ids) && ctr.course_ids.includes(c.id)) ||
+        enrollments.some(e => e.course_id === c.id && e.centre_id === ctr.id)
+      ) || rpOwnedCentres.length > 0;
+    } else {
+      // Non-Mahallu courses: ONLY accessible if Admin assigned this RP to the course or to a batch
+      const isCourseDirect = c.assigned_rp_id === currentRp.id;
+      const isBatchAssigned = Array.isArray(c.batches) && c.batches.some(b => b.assigned_rp_id === currentRp.id);
+      return isCourseDirect || isBatchAssigned;
+    }
+  };
+
   // 1. Course Filter (Mahallu courses prioritized, filtered by lifecycle mode)
   const baseCourses = courses.filter(c => {
+    if (!isCourseAssignedToRP(c)) return false;
     if (viewMode === 'ACTIVE') {
       return c.status !== 'COMPLETED';
     } else {
@@ -185,6 +203,12 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
     if (selectedCourse?.category === 'MAHALLU') {
       return e.centre_id === selectedCentreId;
     } else {
+      // Non-Mahallu: must be assigned to this batch or direct course RP
+      const isCourseDirect = selectedCourse?.assigned_rp_id === currentRp.id;
+      const b = (selectedCourse?.batches || []).find(item => item.id === e.batch_id || item.batch_name === e.batch_id);
+      const isBatchAssigned = isCourseDirect || b?.assigned_rp_id === currentRp.id;
+      if (!isBatchAssigned) return false;
+
       if (!selectedBatchId || selectedBatchId === 'ALL') return true;
       return e.batch_id === selectedBatchId || e.batch_name === selectedBatchId;
     }
@@ -620,87 +644,101 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
                 </div>
               </div>
 
-              {(!selectedCourse.batches || selectedCourse.batches.length === 0) ? (
-                <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: 'var(--radius-md)', color: '#64748b', fontSize: '0.85rem' }}>
-                  Showing all enrolled students ({enrollments.filter(e => e.course_id === selectedCourseId).length}).
-                </div>
-              ) : (
-                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button
-                    onClick={() => setSelectedBatchId('ALL')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.55rem 0.9rem',
-                      borderRadius: 'var(--radius-md)',
-                      border: selectedBatchId === 'ALL' ? '2px solid var(--cpet-primary)' : '1px solid var(--cpet-border)',
-                      background: selectedBatchId === 'ALL' ? 'var(--cpet-primary)' : 'white',
-                      color: selectedBatchId === 'ALL' ? 'white' : 'var(--cpet-primary)',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                      fontSize: '0.85rem'
-                    }}
-                  >
-                    <Layers size={14} />
-                    <span>All Batches</span>
-                    <span
+              {(() => {
+                const isCourseDirect = selectedCourse.assigned_rp_id === currentRp.id;
+                const rpAssignedBatches = (selectedCourse.batches || []).filter(b => isCourseDirect || b.assigned_rp_id === currentRp.id);
+
+                if (rpAssignedBatches.length === 0) {
+                  return (
+                    <div style={{ padding: '1rem', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 'var(--radius-md)', color: '#b45309', fontSize: '0.85rem' }}>
+                      You are not currently assigned as instructor to any batch in this course. Please contact CPET Admin to assign your batch.
+                    </div>
+                  );
+                }
+
+                const allRpBatchStudentsCount = enrollments.filter(e => 
+                  e.course_id === selectedCourseId && 
+                  rpAssignedBatches.some(b => b.id === e.batch_id || b.batch_name === e.batch_id)
+                ).length;
+
+                return (
+                  <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button
+                      onClick={() => setSelectedBatchId('ALL')}
                       style={{
-                        fontSize: '0.72rem',
-                        padding: '1px 6px',
-                        borderRadius: '10px',
-                        background: selectedBatchId === 'ALL' ? 'rgba(255, 255, 255, 0.25)' : '#e0e7ff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.55rem 0.9rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: selectedBatchId === 'ALL' ? '2px solid var(--cpet-primary)' : '1px solid var(--cpet-border)',
+                        background: selectedBatchId === 'ALL' ? 'var(--cpet-primary)' : 'white',
                         color: selectedBatchId === 'ALL' ? 'white' : 'var(--cpet-primary)',
-                        fontWeight: 700
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        fontSize: '0.85rem'
                       }}
                     >
-                      {enrollments.filter(e => e.course_id === selectedCourseId).length}
-                    </span>
-                  </button>
-
-                  {selectedCourse.batches.map(batch => {
-                    const isSelected = selectedBatchId === batch.id;
-                    const batchStudentsCount = enrollments.filter(
-                      e => e.course_id === selectedCourseId && (e.batch_id === batch.id || e.batch_name === batch.batch_name)
-                    ).length;
-
-                    return (
-                      <button
-                        key={batch.id}
-                        onClick={() => setSelectedBatchId(batch.id)}
+                      <Layers size={14} />
+                      <span>All Assigned Batches</span>
+                      <span
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          padding: '0.55rem 0.9rem',
-                          borderRadius: 'var(--radius-md)',
-                          border: isSelected ? '2px solid var(--cpet-primary)' : '1px solid var(--cpet-border)',
-                          background: isSelected ? 'var(--cpet-primary)' : 'white',
-                          color: isSelected ? 'white' : 'var(--cpet-primary)',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          fontSize: '0.85rem'
+                          fontSize: '0.72rem',
+                          padding: '1px 6px',
+                          borderRadius: '10px',
+                          background: selectedBatchId === 'ALL' ? 'rgba(255, 255, 255, 0.25)' : '#e0e7ff',
+                          color: selectedBatchId === 'ALL' ? 'white' : 'var(--cpet-primary)',
+                          fontWeight: 700
                         }}
                       >
-                        <Layers size={14} />
-                        <span>{batch.batch_name}</span>
-                        <span
+                        {allRpBatchStudentsCount}
+                      </span>
+                    </button>
+
+                    {rpAssignedBatches.map(batch => {
+                      const isSelected = selectedBatchId === batch.id;
+                      const batchStudentsCount = enrollments.filter(
+                        e => e.course_id === selectedCourseId && (e.batch_id === batch.id || e.batch_name === batch.batch_name)
+                      ).length;
+
+                      return (
+                        <button
+                          key={batch.id}
+                          onClick={() => setSelectedBatchId(batch.id)}
                           style={{
-                            fontSize: '0.72rem',
-                            padding: '1px 6px',
-                            borderRadius: '10px',
-                            background: isSelected ? 'rgba(255, 255, 255, 0.25)' : '#e0e7ff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.55rem 0.9rem',
+                            borderRadius: 'var(--radius-md)',
+                            border: isSelected ? '2px solid var(--cpet-primary)' : '1px solid var(--cpet-border)',
+                            background: isSelected ? 'var(--cpet-primary)' : 'white',
                             color: isSelected ? 'white' : 'var(--cpet-primary)',
-                            fontWeight: 700
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            fontSize: '0.85rem'
                           }}
                         >
-                          {batchStudentsCount}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                          <Layers size={14} />
+                          <span>{batch.batch_name}</span>
+                          <span
+                            style={{
+                              fontSize: '0.72rem',
+                              padding: '1px 6px',
+                              borderRadius: '10px',
+                              background: isSelected ? 'rgba(255, 255, 255, 0.25)' : '#e0e7ff',
+                              color: isSelected ? 'white' : 'var(--cpet-primary)',
+                              fontWeight: 700
+                            }}
+                          >
+                            {batchStudentsCount}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>
