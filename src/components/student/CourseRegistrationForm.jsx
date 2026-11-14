@@ -151,12 +151,9 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
       return;
     }
 
-    let initialFeeStatus = 'PENDING';
-    if (course.payment_policy === 'FREE_COURSE') initialFeeStatus = 'FREE';
-    else if (course.payment_policy === 'COLLECTED_BY_RP') initialFeeStatus = 'PENDING';
-    else if (course.payment_policy === 'PAY_AT_REGISTRATION' && paymentUtr) initialFeeStatus = 'PENDING';
-    else if (course.payment_policy === 'PAY_ON_SPOT') initialFeeStatus = 'PENDING';
-    else if (course.payment_policy === 'PAY_AFTER_CONFIRMATION') initialFeeStatus = 'PENDING';
+    const isFree = course.payment_policy === 'FREE_COURSE' || (Number(course.standard_fee) || 0) === 0;
+    const initialFeeStatus = isFree ? 'FREE' : 'PENDING';
+    const initialAmountPaid = 0; // Payment starts at 0 (Not Paid) so RP can note actual collection
 
     const enrollment = registerOrEnrollStudent({
       phone,
@@ -170,7 +167,7 @@ export const CourseRegistrationForm = ({ course, onBack, onComplete }) => {
         ...(paymentUtr ? { 'Payment UTR / Ref': paymentUtr } : {})
       },
       feeStatus: initialFeeStatus,
-      amountPaid: (course.payment_policy === 'FREE_COURSE' ? 0 : course.standard_fee)
+      amountPaid: initialAmountPaid
     });
 
     if (onComplete) {

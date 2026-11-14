@@ -35,12 +35,21 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
   // View Mode: 'ACTIVE' (Default - uncluttered) vs 'ARCHIVED' (Past / Completed Batches)
   const [viewMode, setViewMode] = useState('ACTIVE');
 
+  // Helper: Verify centre was founded by or assigned to the current RP
+  const isCentreOwnedByRP = (c) => {
+    if (!currentRp?.id) return false;
+    return c.founded_by_rp_id === currentRp.id || c.assigned_rp_id === currentRp.id;
+  };
+
+  // Centres owned by this RP
+  const rpOwnedCentres = centres.filter(isCentreOwnedByRP);
+
   // 1. Course Filter (Mahallu courses prioritized, filtered by lifecycle mode)
   const baseCourses = courses.filter(c => {
     if (viewMode === 'ACTIVE') {
       return c.status !== 'COMPLETED';
     } else {
-      return c.status === 'COMPLETED' || centres.some(ctr => ctr.completed_course_ids?.includes(c.id));
+      return c.status === 'COMPLETED' || rpOwnedCentres.some(ctr => ctr.completed_course_ids?.includes(c.id));
     }
   });
 
@@ -64,8 +73,8 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
 
   const selectedCourse = courses.find(c => c.id === selectedCourseId) || availableCourses[0];
 
-  // 2. Centres running the selected course (filtered by active vs completed)
-  const centresForCourse = centres.filter(c => {
+  // 2. Centres running the selected course (filtered to current RP's centres only)
+  const centresForCourse = rpOwnedCentres.filter(c => {
     if (!selectedCourseId) return false;
     const isDirect = c.active_course_id === selectedCourseId;
     const inList = Array.isArray(c.course_ids) && c.course_ids.includes(selectedCourseId);
@@ -105,8 +114,8 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
   const [modalCentreId, setModalCentreId] = useState(selectedCentreId || '');
   const [modalBatchId, setModalBatchId] = useState('batch-1');
 
-  // Compute available active centres for the course selected inside modal
-  const modalCentresForCourse = centres.filter(c => {
+  // Compute available active centres for the course selected inside modal (RP's centres only)
+  const modalCentresForCourse = rpOwnedCentres.filter(c => {
     if (!modalCourseId) return false;
     if (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(modalCourseId)) return false;
     const isDirect = c.active_course_id === modalCourseId;
@@ -120,7 +129,7 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
     setModalCourseId(newCourseId);
     const targetCrs = courses.find(c => c.id === newCourseId);
     if (targetCrs?.category === 'MAHALLU') {
-      const availableForNewCourse = centres.filter(c => {
+      const availableForNewCourse = rpOwnedCentres.filter(c => {
         if (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(newCourseId)) return false;
         const isDirect = c.active_course_id === newCourseId;
         const inList = Array.isArray(c.course_ids) && c.course_ids.includes(newCourseId);
@@ -147,8 +156,8 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
     place: ''
   });
 
-  // Attach Existing Centre to Course State
-  const [centreToAttachId, setCentreToAttachId] = useState(centres[0]?.id || '');
+  // Attach Existing Centre to Course State (RP's centres only)
+  const [centreToAttachId, setCentreToAttachId] = useState(rpOwnedCentres[0]?.id || '');
 
   // Open Add Student Modal initialized to current selections
   const openAddStudentModal = () => {
@@ -244,8 +253,8 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
       courseId: modalCourseId,
       centreId: isMahallu ? modalCentreId : null,
       batchId: !isMahallu ? modalBatchId : null,
-      feeStatus: 'PAID_TO_RP',
-      amountPaid: courseObj?.standard_fee || 0
+      feeStatus: courseObj?.payment_policy === 'FREE_COURSE' || (Number(courseObj?.standard_fee) || 0) === 0 ? 'FREE' : 'PENDING',
+      amountPaid: 0
     });
 
     // Automatically navigate view to this course & centre/batch so RP sees the new student
@@ -314,16 +323,10 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
             Mahallu Courses & Evaluation
           </h3>
           <p className="cpet-card-desc">
-            Select a Mahallu course to view active study centres, track enrolled students, mark attendance, and submit exam scores.
+            Select a Mahallu course to view active study centres, manage enrolled students, and track fee collection.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {onNavigateToEvaluation && (
-            <button className="btn btn-secondary" onClick={onNavigateToEvaluation}>
-              <Award size={15} />
-              Marks & Attendance Register
-            </button>
-          )}
           <button className="btn btn-outline" onClick={() => setShowAttachCentreModal(true)}>
             <Plus size={15} />
             Launch Course at Centre
@@ -439,13 +442,19 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}>
             {availableCourses.map(course => {
               const isSelected = course.id === selectedCourseId;
-              const courseCentres = centres.filter(c => {
+              const courseCentres = rpOwnedCentres.filter(c => {
                 const isDirect = c.active_course_id === course.id;
                 const inList = Array.isArray(c.course_ids) && c.course_ids.includes(course.id);
                 const hasStudents = enrollments.some(e => e.course_id === course.id && e.centre_id === c.id);
                 return isDirect || inList || hasStudents;
               });
-              const courseEnrolledCount = enrollments.filter(e => e.course_id === course.id).length;
+              const courseEnrolledCount = enrollments.filter(e => {
+                if (e.course_id !== course.id) return false;
+                if (course.category === 'MAHALLU') {
+                  return rpOwnedCentres.some(c => c.id === e.centre_id);
+                }
+                return true;
+              }).length;
 
               return (
                 <div
@@ -1280,9 +1289,9 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
                   <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
                     Select Existing Study Centre:
                   </label>
-                  {centres.length === 0 ? (
+                  {rpOwnedCentres.length === 0 ? (
                     <p style={{ fontSize: '0.85rem', color: '#dc2626' }}>
-                      No study centres found in database. Please register a centre first.
+                      No study centres registered under your account yet. Please register a centre first.
                     </p>
                   ) : (
                     <select
@@ -1291,7 +1300,7 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
                       onChange={e => setCentreToAttachId(e.target.value)}
                       style={{ fontWeight: 600 }}
                     >
-                      {centres.map(c => (
+                      {rpOwnedCentres.map(c => (
                         <option key={c.id} value={c.id}>
                           {c.centre_name} ({c.place}, {c.district}) — Code: {c.centre_code}
                         </option>

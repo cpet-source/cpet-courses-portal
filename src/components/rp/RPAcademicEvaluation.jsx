@@ -18,6 +18,7 @@ import {
 
 export const RPAcademicEvaluation = () => {
   const {
+    currentRp,
     courses,
     centres,
     enrollments,
@@ -30,12 +31,20 @@ export const RPAcademicEvaluation = () => {
   // View Mode: 'ACTIVE' (Default) vs 'ARCHIVED' (Past / Completed Batches)
   const [viewMode, setViewMode] = useState('ACTIVE');
 
+  // Helper: Verify centre was founded by or assigned to the current RP
+  const isCentreOwnedByRP = (c) => {
+    if (!currentRp?.id) return false;
+    return c.founded_by_rp_id === currentRp.id || c.assigned_rp_id === currentRp.id;
+  };
+
+  const rpOwnedCentres = centres.filter(isCentreOwnedByRP);
+
   // 1. Course Selection (filtered by active vs concluded)
   const baseCourses = courses.filter(c => {
     if (viewMode === 'ACTIVE') {
       return c.status !== 'COMPLETED';
     } else {
-      return c.status === 'COMPLETED' || centres.some(ctr => ctr.completed_course_ids?.includes(c.id));
+      return c.status === 'COMPLETED' || rpOwnedCentres.some(ctr => ctr.completed_course_ids?.includes(c.id));
     }
   });
 
@@ -51,8 +60,8 @@ export const RPAcademicEvaluation = () => {
 
   const selectedCourse = courses.find(c => c.id === selectedCourseId) || availableCourses[0];
 
-  // 2. Study Centres running selected course (filtered by active vs completed)
-  const courseCentres = centres.filter(c => {
+  // 2. Study Centres running selected course (scoped strictly to current RP's centres)
+  const courseCentres = rpOwnedCentres.filter(c => {
     if (!selectedCourseId) return false;
     const isDirect = c.active_course_id === selectedCourseId;
     const inList = Array.isArray(c.course_ids) && c.course_ids.includes(selectedCourseId);
@@ -66,13 +75,17 @@ export const RPAcademicEvaluation = () => {
     return viewMode === 'ACTIVE' ? !isBatchCompleted : isBatchCompleted;
   });
 
-  const [selectedCentreId, setSelectedCentreId] = useState(courseCentres[0]?.id || centres[0]?.id || '');
+  const [selectedCentreId, setSelectedCentreId] = useState(courseCentres[0]?.id || '');
 
   useEffect(() => {
-    if (courseCentres.length > 0 && !courseCentres.some(c => c.id === selectedCentreId)) {
-      setSelectedCentreId(courseCentres[0].id);
+    if (courseCentres.length > 0) {
+      if (!courseCentres.some(c => c.id === selectedCentreId)) {
+        setSelectedCentreId(courseCentres[0].id);
+      }
+    } else {
+      setSelectedCentreId('');
     }
-  }, [selectedCourseId, centres, enrollments, viewMode]);
+  }, [selectedCourseId, courseCentres, viewMode]);
 
   const selectedCentre = centres.find(c => c.id === selectedCentreId) || courseCentres[0];
 
@@ -214,24 +227,15 @@ export const RPAcademicEvaluation = () => {
                 onChange={e => setSelectedCentreId(e.target.value)}
                 style={{ fontWeight: 700 }}
               >
-                {courseCentres.length > 0 && (
-                  <optgroup label="Centres offering this course">
-                    {courseCentres.map(c => (
-                      <option key={c.id} value={c.id}>
-                        ★ {c.centre_name} ({c.place})
-                      </option>
-                    ))}
-                  </optgroup>
+                {courseCentres.length === 0 ? (
+                  <option value="">-- No study centres registered under your account --</option>
+                ) : (
+                  courseCentres.map(c => (
+                    <option key={c.id} value={c.id}>
+                      🏛️ {c.centre_name} ({c.place}, {c.district})
+                    </option>
+                  ))
                 )}
-                <optgroup label={courseCentres.length > 0 ? "Other Study Centres" : "All Study Centres"}>
-                  {centres
-                    .filter(c => !courseCentres.some(m => m.id === c.id))
-                    .map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.centre_name} ({c.place})
-                      </option>
-                    ))}
-                </optgroup>
               </select>
             </div>
           ) : (

@@ -24,6 +24,7 @@ export const RPClassLogger = () => {
     class_date: new Date().toISOString().split('T')[0],
     session_type: 'REGULAR_CLASS',
     hours_spent: 2.0,
+    travel_allowance: '',
     syllabus_covered: ''
   });
 
@@ -35,6 +36,7 @@ export const RPClassLogger = () => {
     class_date: '',
     session_type: 'REGULAR_CLASS',
     hours_spent: 2.0,
+    travel_allowance: '',
     syllabus_covered: ''
   });
 
@@ -96,9 +98,10 @@ export const RPClassLogger = () => {
       return;
     }
 
+    const taVal = Math.max(0, Number(formData.travel_allowance) || 0);
     addClassLog({
       ...formData,
-      travel_allowance: 0
+      travel_allowance: taVal
     });
     setShowLogModal(false);
 
@@ -111,6 +114,7 @@ export const RPClassLogger = () => {
       class_date: new Date().toISOString().split('T')[0],
       session_type: 'REGULAR_CLASS',
       hours_spent: 2.0,
+      travel_allowance: '',
       syllabus_covered: ''
     });
   };
@@ -124,6 +128,7 @@ export const RPClassLogger = () => {
       class_date: log.class_date || new Date().toISOString().split('T')[0],
       session_type: log.session_type || 'REGULAR_CLASS',
       hours_spent: log.hours_spent || 2.0,
+      travel_allowance: log.travel_allowance ? String(log.travel_allowance) : '',
       syllabus_covered: log.syllabus_covered || ''
     });
   };
@@ -138,9 +143,10 @@ export const RPClassLogger = () => {
       return;
     }
 
+    const editTaVal = Math.max(0, Number(editFormData.travel_allowance) || 0);
     updateClassLog(editingLog.id, {
       ...editFormData,
-      travel_allowance: 0
+      travel_allowance: editTaVal
     });
     setEditingLog(null);
   };
@@ -281,7 +287,14 @@ export const RPClassLogger = () => {
                   <span>{log.session_type.replace('_', ' ')} ({log.hours_spent}h)</span>
                 </div>
                 <div className="card-meta-item" style={{ marginLeft: 'auto', fontWeight: 700, color: 'var(--cpet-primary)' }}>
-                  <span>Claim: ₹{log.total_claim}</span>
+                  <span>
+                    Claim: ₹{log.total_claim}
+                    {Number(log.travel_allowance) > 0 && (
+                      <span style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginLeft: '6px' }}>
+                        (Wage: ₹{(Number(log.total_claim) || 0) - Number(log.travel_allowance)} + TA: ₹{log.travel_allowance})
+                      </span>
+                    )}
+                  </span>
                 </div>
               </div>
 
@@ -439,16 +452,43 @@ export const RPClassLogger = () => {
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Duration (Hours)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    className="form-input"
-                    value={formData.hours_spent}
-                    onChange={e => setFormData({ ...formData, hours_spent: Number(e.target.value) })}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Duration (Hours)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      className="form-input"
+                      value={formData.hours_spent}
+                      onChange={e => setFormData({ ...formData, hours_spent: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Travel Allowance (TA ₹)</label>
+                    <input
+                      type="number"
+                      step="50"
+                      min="0"
+                      placeholder="e.g. 200 (optional)"
+                      className="form-input"
+                      value={formData.travel_allowance}
+                      onChange={e => setFormData({ ...formData, travel_allowance: e.target.value })}
+                    />
+                  </div>
                 </div>
+
+                {/* Dynamic Claim Preview */}
+                {(() => {
+                  const targetCrs = courses.find(c => c.id === formData.course_id);
+                  const wageRate = Number(targetCrs?.default_rp_remuneration_per_class || 800);
+                  const taVal = Math.max(0, Number(formData.travel_allowance) || 0);
+                  return (
+                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '0.45rem 0.75rem', marginBottom: '0.75rem', fontSize: '0.8rem', color: '#166534', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Session Wage: <strong>₹{wageRate}</strong> {taVal > 0 ? `+ TA: ₹${taVal}` : ''}</span>
+                      <strong style={{ fontSize: '0.88rem', color: '#15803d' }}>Total Claim: ₹{wageRate + taVal}</strong>
+                    </div>
+                  );
+                })()}
 
                 <div className="form-group">
                   <label className="form-label">Syllabus / Chapter Covered <span className="required">*</span></label>
@@ -595,16 +635,43 @@ export const RPClassLogger = () => {
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Duration (Hours)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    className="form-input"
-                    value={editFormData.hours_spent}
-                    onChange={e => setEditFormData({ ...editFormData, hours_spent: Number(e.target.value) })}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Duration (Hours)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      className="form-input"
+                      value={editFormData.hours_spent}
+                      onChange={e => setEditFormData({ ...editFormData, hours_spent: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Travel Allowance (TA ₹)</label>
+                    <input
+                      type="number"
+                      step="50"
+                      min="0"
+                      placeholder="e.g. 200 (optional)"
+                      className="form-input"
+                      value={editFormData.travel_allowance}
+                      onChange={e => setEditFormData({ ...editFormData, travel_allowance: e.target.value })}
+                    />
+                  </div>
                 </div>
+
+                {/* Dynamic Claim Preview */}
+                {(() => {
+                  const targetCrs = courses.find(c => c.id === editFormData.course_id);
+                  const wageRate = Number(targetCrs?.default_rp_remuneration_per_class || 800);
+                  const taVal = Math.max(0, Number(editFormData.travel_allowance) || 0);
+                  return (
+                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '0.45rem 0.75rem', marginBottom: '0.75rem', fontSize: '0.8rem', color: '#166534', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Session Wage: <strong>₹{wageRate}</strong> {taVal > 0 ? `+ TA: ₹${taVal}` : ''}</span>
+                      <strong style={{ fontSize: '0.88rem', color: '#15803d' }}>Total Claim: ₹{wageRate + taVal}</strong>
+                    </div>
+                  );
+                })()}
 
                 <div className="form-group">
                   <label className="form-label">Syllabus / Chapter Covered <span className="required">*</span></label>

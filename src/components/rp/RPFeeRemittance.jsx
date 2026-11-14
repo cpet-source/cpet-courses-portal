@@ -6,12 +6,18 @@ export const RPFeeRemittance = () => {
   const { currentRp, centres, courses, remittances, addRemittance, enrollments, showToast } = useApp();
   const [showModal, setShowModal] = useState(false);
 
-  const assignedCentres = centres.filter(c => c.assigned_rp_id === currentRp.id);
-  const assignedCentreIds = new Set(assignedCentres.map(c => c.id));
+  // Helper: Verify centre was founded by or assigned to current RP
+  const isCentreOwnedByRP = (c) => {
+    if (!currentRp?.id) return false;
+    return c.founded_by_rp_id === currentRp.id || c.assigned_rp_id === currentRp.id;
+  };
+
+  const rpCentres = centres.filter(isCentreOwnedByRP);
+  const rpCentreIds = new Set(rpCentres.map(c => c.id));
   const rpRemittances = remittances.filter(r => r.rp_id === currentRp.id);
 
   // Enrollments belonging to this RP's centres (or Mahallu centres assigned)
-  const rpEnrollments = enrollments.filter(e => e.centre_id && assignedCentreIds.has(e.centre_id));
+  const rpEnrollments = enrollments.filter(e => e.centre_id && rpCentreIds.has(e.centre_id));
 
   // 1. Total actual money collected by RP from students (Credited)
   const totalStudentFeesCredited = rpEnrollments.reduce((sum, e) => sum + (Number(e.amount_paid) || 0), 0);
@@ -30,35 +36,34 @@ export const RPFeeRemittance = () => {
   }, 0);
   const totalStudentDues = Math.max(0, totalExpectedRevenue - totalStudentFeesCredited);
 
-  // Form State
+  // Form State (Centres scoped strictly to this RP)
   const initialCourseId = courses[0]?.id || '';
-  const initialCentresForCourse = centres.filter(c => 
+  const initialCentresForCourse = rpCentres.filter(c => 
     !initialCourseId || c.active_course_id === initialCourseId || (c.course_ids && c.course_ids.includes(initialCourseId))
   );
 
   const [formData, setFormData] = useState({
     course_id: initialCourseId,
-    centre_id: initialCentresForCourse[0]?.id || centres[0]?.id || '',
+    centre_id: initialCentresForCourse[0]?.id || rpCentres[0]?.id || '',
     amount: '',
     payment_mode: 'BANK_TRANSFER',
     transaction_ref: '',
-    student_count: 5,
     notes: ''
   });
 
-  const availableCentres = centres.filter(c => {
+  const availableCentres = rpCentres.filter(c => {
     if (!formData.course_id) return true;
     return c.active_course_id === formData.course_id || (c.course_ids && c.course_ids.includes(formData.course_id));
   });
 
   const handleCourseChange = (selectedCourseId) => {
-    const validCentres = centres.filter(c => 
+    const validCentres = rpCentres.filter(c => 
       !selectedCourseId || c.active_course_id === selectedCourseId || (c.course_ids && c.course_ids.includes(selectedCourseId))
     );
     setFormData(prev => ({
       ...prev,
       course_id: selectedCourseId,
-      centre_id: validCentres[0]?.id || (centres[0]?.id || '')
+      centre_id: validCentres[0]?.id || (rpCentres[0]?.id || '')
     }));
   };
 
@@ -80,11 +85,10 @@ export const RPFeeRemittance = () => {
     setShowModal(false);
     setFormData({
       course_id: courses[0]?.id || '',
-      centre_id: initialCentresForCourse[0]?.id || centres[0]?.id || '',
+      centre_id: initialCentresForCourse[0]?.id || rpCentres[0]?.id || '',
       amount: '',
       payment_mode: 'BANK_TRANSFER',
       transaction_ref: '',
-      student_count: 5,
       notes: ''
     });
   };
@@ -268,41 +272,30 @@ export const RPFeeRemittance = () => {
                   </select>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '0.75rem' }}>
-                  <div className="form-group">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                      <label className="form-label" style={{ margin: 0 }}>Total Amount (₹) <span className="required">*</span></label>
-                      {selectedCentreBalance > 0 && (
-                        <button
-                          type="button"
-                          className="btn btn-sm"
-                          style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', fontSize: '0.68rem', padding: '1px 6px', fontWeight: 700 }}
-                          onClick={() => setFormData(prev => ({ ...prev, amount: String(selectedCentreBalance) }))}
-                        >
-                          Fill In-Hand: ₹{selectedCentreBalance}
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      className="form-input"
-                      required
-                      placeholder="e.g. 15000"
-                      value={formData.amount}
-                      onChange={e => setFormData({ ...formData, amount: e.target.value })}
-                    />
-                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>
-                      Collected here: <strong>₹{selectedCentreCollected}</strong> | Remitted: <strong>₹{selectedCentreRemitted}</strong>
-                    </div>
+                <div className="form-group">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label className="form-label" style={{ margin: 0 }}>Total Amount (₹) <span className="required">*</span></label>
+                    {selectedCentreBalance > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', fontSize: '0.68rem', padding: '1px 6px', fontWeight: 700 }}
+                        onClick={() => setFormData(prev => ({ ...prev, amount: String(selectedCentreBalance) }))}
+                      >
+                        Fill In-Hand: ₹{selectedCentreBalance}
+                      </button>
+                    )}
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Students Covered</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={formData.student_count}
-                      onChange={e => setFormData({ ...formData, student_count: e.target.value })}
-                    />
+                  <input
+                    type="number"
+                    className="form-input"
+                    required
+                    placeholder="e.g. 15000"
+                    value={formData.amount}
+                    onChange={e => setFormData({ ...formData, amount: e.target.value })}
+                  />
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>
+                    Collected here: <strong>₹{selectedCentreCollected}</strong> | Remitted: <strong>₹{selectedCentreRemitted}</strong>
                   </div>
                 </div>
 
