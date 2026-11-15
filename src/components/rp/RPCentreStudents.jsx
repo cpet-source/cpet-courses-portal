@@ -406,343 +406,111 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
         )}
       </div>
 
-      {/* STEP 1: Course Selector with Category Tabs */}
-      <div className="cpet-tabs" style={{ marginBottom: '0.85rem' }}>
-        <button
-          type="button"
-          className={`tab-btn ${courseCategoryFilter === 'ALL' ? 'active' : ''}`}
-          onClick={() => setCourseCategoryFilter('ALL')}
-        >
-          All Programs
-        </button>
-        <button
-          type="button"
-          className={`tab-btn ${courseCategoryFilter === 'MAHALLU' ? 'active' : ''}`}
-          onClick={() => setCourseCategoryFilter('MAHALLU')}
-        >
-          Mahallu Study Centres
-        </button>
-        <button
-          type="button"
-          className={`tab-btn ${courseCategoryFilter === 'ONLINE' ? 'active' : ''}`}
-          onClick={() => setCourseCategoryFilter('ONLINE')}
-        >
-          Online Courses
-        </button>
-        <button
-          type="button"
-          className={`tab-btn ${courseCategoryFilter === 'LANGUAGE_ACADEMY' ? 'active' : ''}`}
-          onClick={() => setCourseCategoryFilter('LANGUAGE_ACADEMY')}
-        >
-          Language Academy
-        </button>
-        <button
-          type="button"
-          className={`tab-btn ${courseCategoryFilter === 'OFFLINE_WORKSHOP' ? 'active' : ''}`}
-          onClick={() => setCourseCategoryFilter('OFFLINE_WORKSHOP')}
-        >
-          Workshops / Camps
-        </button>
-      </div>
+      {/* ── Compact Selector Card: Course + Centre/Batch (matches Marks & Attendance style) ── */}
+      <div className="cpet-card" style={{ marginBottom: '1.25rem', padding: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
 
-      <div className="cpet-card" style={{ marginBottom: '1.25rem', padding: '1rem 1.25rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cpet-primary)', background: '#e0e7ff', padding: '3px 8px', borderRadius: '4px' }}>
-              Step 1
-            </span>
-            <strong style={{ fontSize: '0.95rem', color: '#1e293b' }}>Select Course / Program:</strong>
-          </div>
-          <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-            {availableCourses.length} Program{availableCourses.length !== 1 ? 's' : ''} available
-          </span>
-        </div>
-
-        {availableCourses.length === 0 ? (
-          <div style={{ padding: '1.5rem', textAlign: 'center', background: '#f8fafc', borderRadius: 'var(--radius-md)', color: '#64748b' }}>
-            No courses found under this category filter.
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}>
-            {availableCourses.map(course => {
-              const isSelected = course.id === selectedCourseId;
-              const courseCentres = rpOwnedCentres.filter(c => {
-                const isDirect = c.active_course_id === course.id;
-                const inList = Array.isArray(c.course_ids) && c.course_ids.includes(course.id);
-                const hasStudents = enrollments.some(e => e.course_id === course.id && e.centre_id === c.id);
-                return isDirect || inList || hasStudents;
-              });
-              const courseEnrolledCount = enrollments.filter(e => {
-                if (e.course_id !== course.id) return false;
-                if (course.category === 'MAHALLU') {
-                  return rpOwnedCentres.some(c => c.id === e.centre_id);
-                }
-                return true;
-              }).length;
-
-              return (
-                <div
-                  key={course.id}
-                  onClick={() => setSelectedCourseId(course.id)}
-                  style={{
-                    padding: '0.85rem 1rem',
-                    borderRadius: 'var(--radius-md)',
-                    border: isSelected ? '2px solid var(--cpet-primary)' : '1px solid var(--cpet-border)',
-                    background: isSelected ? 'linear-gradient(135deg, #f0f4ff 0%, #ffffff 100%)' : 'white',
-                    boxShadow: isSelected ? '0 4px 12px rgba(50, 53, 126, 0.12)' : 'none',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    position: 'relative'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem' }}>
-                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: isSelected ? 'var(--cpet-primary)' : '#64748b', background: isSelected ? '#dbeafe' : '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
-                        {course.course_code || 'COURSE'}
-                      </span>
-                      <span style={{ fontSize: '0.67rem', color: '#64748b' }}>
-                        [{course.category === 'MAHALLU' ? 'Mahallu' : course.category?.replace(/_/g, ' ')}]
-                      </span>
-                    </div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--cpet-accent)' }}>
-                      {course.standard_fee > 0 ? `₹${course.standard_fee}` : 'FREE'}
-                    </span>
-                  </div>
-
-                  <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: isSelected ? 'var(--cpet-primary)' : '#1e293b', marginBottom: '0.4rem', lineHeight: 1.3 }}>
-                    {course.title}
-                  </h4>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.75rem', color: '#64748b' }}>
-                    {course.category === 'MAHALLU' ? (
-                      <span>🏛️ <strong>{courseCentres.length}</strong> {courseCentres.length === 1 ? 'Centre' : 'Centres'}</span>
-                    ) : (
-                      <span>🏷️ <strong>{course.batches?.length || 1}</strong> {course.batches?.length === 1 ? 'Batch' : 'Batches'}</span>
-                    )}
-                    <span>•</span>
-                    <span>👥 <strong>{courseEnrolledCount}</strong> Students</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* STEP 2: Centres (Mahallu) OR Batches (Online / Language / Workshops) */}
-      {selectedCourse && (
-        <div className="cpet-card" style={{ marginBottom: '1.25rem', padding: '1rem 1.25rem' }}>
-          {selectedCourse.category === 'MAHALLU' ? (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cpet-primary)', background: '#e0e7ff', padding: '3px 8px', borderRadius: '4px' }}>
-                    Step 2
-                  </span>
-                  <strong style={{ fontSize: '0.95rem', color: '#1e293b' }}>
-                    Centres Offering "{selectedCourse.title}":
-                  </strong>
-                </div>
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setShowAttachCentreModal(true)}
-                    title="Launch this course at an existing centre"
-                  >
-                    + Launch at Existing Centre
-                  </button>
-                  {onNavigateToNewCentre && (
-                    <button
-                      className="btn btn-outline btn-sm"
-                      onClick={onNavigateToNewCentre}
-                      title="Register completely new centre"
-                    >
-                      + New Centre Form
-                    </button>
-                  )}
-                </div>
+          {/* 1. Select Course / Program */}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+              1. Select Course / Program:
+            </label>
+            {availableCourses.length === 0 ? (
+              <div style={{ padding: '0.65rem 0.85rem', background: '#f8fafc', border: '1px solid var(--cpet-border)', borderRadius: 'var(--radius-md)', color: '#64748b', fontSize: '0.85rem' }}>
+                No courses assigned to you yet.
               </div>
+            ) : (
+              <select
+                className="form-select"
+                value={selectedCourseId}
+                onChange={e => setSelectedCourseId(e.target.value)}
+                style={{ fontWeight: 700 }}
+              >
+                {availableCourses.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.title} ({c.course_code}) · {c.category === 'MAHALLU' ? 'Mahallu' : c.category?.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
 
+          {/* 2. Select Study Centre (Mahallu) OR Batch (non-Mahallu) */}
+          {selectedCourse?.category === 'MAHALLU' ? (
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                2. Select Study Centre:
+              </label>
               {centresForCourse.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem 1.5rem', background: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px dashed var(--cpet-border)' }}>
-                  <AlertCircle size={32} style={{ color: '#94a3b8', margin: '0 auto 0.5rem' }} />
-                  <h4 style={{ fontSize: '0.95rem', color: '#1e293b', marginBottom: '0.35rem' }}>
-                    No Study Centres currently offering this course
-                  </h4>
-                  <p style={{ fontSize: '0.82rem', color: '#64748b', maxWidth: '480px', margin: '0 auto 1rem' }}>
-                    A Mahallu centre that completed its first course can now launch <strong>{selectedCourse.title}</strong> as its next batch!
-                  </p>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <button className="btn btn-primary btn-sm" onClick={() => setShowAttachCentreModal(true)}>
-                      <Plus size={14} /> Launch at an Existing Centre
-                    </button>
-                    {onNavigateToNewCentre && (
-                      <button className="btn btn-secondary btn-sm" onClick={onNavigateToNewCentre}>
-                        <Building size={14} /> Register New Centre
-                      </button>
-                    )}
-                  </div>
+                <div style={{ padding: '0.65rem 0.85rem', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 'var(--radius-md)', color: '#b45309', fontSize: '0.85rem' }}>
+                  No centres for this course yet.
                 </div>
               ) : (
-                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  {centresForCourse.map(centre => {
-                    const isSelected = centre.id === selectedCentreId;
-                    const centreStudentsInCourse = enrollments.filter(
-                      e => e.course_id === selectedCourseId && e.centre_id === centre.id
-                    ).length;
-
+                <select
+                  className="form-select"
+                  value={selectedCentreId}
+                  onChange={e => setSelectedCentreId(e.target.value)}
+                  style={{ fontWeight: 700 }}
+                >
+                  {centresForCourse.map(c => {
+                    const count = enrollments.filter(e => e.course_id === selectedCourseId && e.centre_id === c.id).length;
                     return (
-                      <button
-                        key={centre.id}
-                        onClick={() => setSelectedCentreId(centre.id)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          padding: '0.55rem 0.9rem',
-                          borderRadius: 'var(--radius-md)',
-                          border: isSelected ? '2px solid var(--cpet-primary)' : '1px solid var(--cpet-border)',
-                          background: isSelected ? 'var(--cpet-primary)' : 'white',
-                          color: isSelected ? 'white' : 'var(--cpet-primary)',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          fontSize: '0.85rem',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <Building size={14} />
-                        <span>{centre.centre_name} ({centre.place})</span>
-                        <span
-                          style={{
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            padding: '1px 6px',
-                            borderRadius: '10px',
-                            background: isSelected ? 'rgba(255, 255, 255, 0.25)' : '#e0e7ff',
-                            color: isSelected ? 'white' : 'var(--cpet-primary)'
-                          }}
-                        >
-                          {centreStudentsInCourse}
-                        </span>
-                      </button>
+                      <option key={c.id} value={c.id}>
+                        🏛️ {c.centre_name} ({c.place}) · {count} student{count !== 1 ? 's' : ''}
+                      </option>
                     );
                   })}
-                </div>
+                </select>
               )}
-            </>
-          ) : (
-            <>
-              {/* Batch Selector for Online / Language / Workshops */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cpet-primary)', background: '#e0e7ff', padding: '3px 8px', borderRadius: '4px' }}>
-                    Step 2
-                  </span>
-                  <strong style={{ fontSize: '0.95rem', color: '#1e293b' }}>
-                    Batches & Cohorts for "{selectedCourse.title}":
-                  </strong>
-                </div>
-              </div>
-
+            </div>
+          ) : selectedCourse ? (
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" style={{ fontWeight: 700, color: 'var(--cpet-primary)' }}>
+                2. Select Batch / Cohort:
+              </label>
               {(() => {
                 const isCourseDirect = selectedCourse.assigned_rp_id === currentRp.id;
                 const rpAssignedBatches = (selectedCourse.batches || []).filter(b => isCourseDirect || b.assigned_rp_id === currentRp.id);
-
                 if (rpAssignedBatches.length === 0) {
                   return (
-                    <div style={{ padding: '1rem', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 'var(--radius-md)', color: '#b45309', fontSize: '0.85rem' }}>
-                      You are not currently assigned as instructor to any batch in this course. Please contact CPET Admin to assign your batch.
+                    <div style={{ padding: '0.65rem 0.85rem', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 'var(--radius-md)', color: '#b45309', fontSize: '0.85rem' }}>
+                      Not assigned to any batch. Contact Admin.
                     </div>
                   );
                 }
-
-                const allRpBatchStudentsCount = enrollments.filter(e => 
-                  e.course_id === selectedCourseId && 
-                  rpAssignedBatches.some(b => b.id === e.batch_id || b.batch_name === e.batch_id)
-                ).length;
-
                 return (
-                  <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <button
-                      onClick={() => setSelectedBatchId('ALL')}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        padding: '0.55rem 0.9rem',
-                        borderRadius: 'var(--radius-md)',
-                        border: selectedBatchId === 'ALL' ? '2px solid var(--cpet-primary)' : '1px solid var(--cpet-border)',
-                        background: selectedBatchId === 'ALL' ? 'var(--cpet-primary)' : 'white',
-                        color: selectedBatchId === 'ALL' ? 'white' : 'var(--cpet-primary)',
-                        cursor: 'pointer',
-                        fontWeight: 600,
-                        fontSize: '0.85rem'
-                      }}
-                    >
-                      <Layers size={14} />
-                      <span>All Assigned Batches</span>
-                      <span
-                        style={{
-                          fontSize: '0.72rem',
-                          padding: '1px 6px',
-                          borderRadius: '10px',
-                          background: selectedBatchId === 'ALL' ? 'rgba(255, 255, 255, 0.25)' : '#e0e7ff',
-                          color: selectedBatchId === 'ALL' ? 'white' : 'var(--cpet-primary)',
-                          fontWeight: 700
-                        }}
-                      >
-                        {allRpBatchStudentsCount}
-                      </span>
-                    </button>
-
-                    {rpAssignedBatches.map(batch => {
-                      const isSelected = selectedBatchId === batch.id;
-                      const batchStudentsCount = enrollments.filter(
-                        e => e.course_id === selectedCourseId && (e.batch_id === batch.id || e.batch_name === batch.batch_name)
-                      ).length;
-
-                      return (
-                        <button
-                          key={batch.id}
-                          onClick={() => setSelectedBatchId(batch.id)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            padding: '0.55rem 0.9rem',
-                            borderRadius: 'var(--radius-md)',
-                            border: isSelected ? '2px solid var(--cpet-primary)' : '1px solid var(--cpet-border)',
-                            background: isSelected ? 'var(--cpet-primary)' : 'white',
-                            color: isSelected ? 'white' : 'var(--cpet-primary)',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            fontSize: '0.85rem'
-                          }}
-                        >
-                          <Layers size={14} />
-                          <span>{batch.batch_name}</span>
-                          <span
-                            style={{
-                              fontSize: '0.72rem',
-                              padding: '1px 6px',
-                              borderRadius: '10px',
-                              background: isSelected ? 'rgba(255, 255, 255, 0.25)' : '#e0e7ff',
-                              color: isSelected ? 'white' : 'var(--cpet-primary)',
-                              fontWeight: 700
-                            }}
-                          >
-                            {batchStudentsCount}
-                          </span>
-                        </button>
-                      );
+                  <select
+                    className="form-select"
+                    value={selectedBatchId}
+                    onChange={e => setSelectedBatchId(e.target.value)}
+                    style={{ fontWeight: 700 }}
+                  >
+                    <option value="ALL">All Assigned Batches</option>
+                    {rpAssignedBatches.map(b => {
+                      const count = enrollments.filter(e => e.course_id === selectedCourseId && (e.batch_id === b.id || e.batch_name === b.batch_name)).length;
+                      return <option key={b.id} value={b.id}>{b.batch_name} · {count} student{count !== 1 ? 's' : ''}</option>;
                     })}
-                  </div>
+                  </select>
                 );
               })()}
-            </>
-          )}
+            </div>
+          ) : null}
         </div>
-      )}
+
+        {/* Quick action buttons — only for Mahallu courses */}
+        {selectedCourse?.category === 'MAHALLU' && (
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid var(--cpet-border)', flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowAttachCentreModal(true)}>
+              <Plus size={13} /> Launch at Existing Centre
+            </button>
+            {onNavigateToNewCentre && (
+              <button className="btn btn-outline btn-sm" onClick={onNavigateToNewCentre}>
+                <Building size={13} /> Register New Centre
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* STEP 3: Student Roster & Evaluation */}
       {selectedCourse && (selectedCourse.category === 'MAHALLU' ? selectedCentre : true) && (
