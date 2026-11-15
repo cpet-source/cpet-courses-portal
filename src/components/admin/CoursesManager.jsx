@@ -18,6 +18,7 @@ export const CoursesManager = () => {
     updateBatchStatus,
     assignRpToBatch,
     deleteStudentEnrollment,
+    deleteStudentEnrollmentsBatch,
     showToast,
     setActiveRole
   } = useApp();
@@ -36,6 +37,7 @@ export const CoursesManager = () => {
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [studentFeeFilter, setStudentFeeFilter] = useState('ALL');
   const [rosterTab, setRosterTab] = useState('STUDENTS'); // 'STUDENTS' | 'RESPONSES'
+  const [selectedStudentEnrollmentIds, setSelectedStudentEnrollmentIds] = useState([]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -1017,7 +1019,7 @@ export const CoursesManager = () => {
 
       {/* Enrolled Students Modal */}
       {selectedCourseForStudentsModal && (
-        <div className="modal-overlay" onClick={() => setSelectedCourseForStudentsModal(null)}>
+        <div className="modal-overlay" onClick={() => { setSelectedCourseForStudentsModal(null); setSelectedStudentEnrollmentIds([]); }}>
           <div
             className="modal-content"
             style={{ maxWidth: '1180px', width: '96%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
@@ -1045,7 +1047,7 @@ export const CoursesManager = () => {
                   Course-specific Student Roster & Questionnaire Responses Desk
                 </p>
               </div>
-              <button className="modal-close-btn" onClick={() => setSelectedCourseForStudentsModal(null)}>✕</button>
+              <button className="modal-close-btn" onClick={() => { setSelectedCourseForStudentsModal(null); setSelectedStudentEnrollmentIds([]); }}>✕</button>
             </div>
 
             {/* View Switcher Tabs (Students Roster vs Form Responses) */}
@@ -1285,100 +1287,190 @@ export const CoursesManager = () => {
                 </div>
               ) : (
                 /* Standard Attendance Roster Table */
-                <div className="table-responsive">
-                  <table className="cpet-table" style={{ fontSize: '0.82rem' }}>
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Admission No</th>
-                        <th>Student Name</th>
-                        <th>Contact</th>
-                        <th>{currentModalCourse?.category === 'MAHALLU' ? 'Study Centre' : 'Batch / Cohort'}</th>
-                        <th>Attendance</th>
-                        <th>Fee Status</th>
-                        <th>Enrolled On</th>
-                        <th style={{ textAlign: 'right' }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {modalFilteredStudents.map((enr, idx) => {
-                        const std = Number(currentModalCourse?.standard_fee) || 0;
-                        const amt = Number(enr.amount_paid) || 0;
-                        const isFree = enr.fee_status === 'FREE' || std === 0;
-                        const isFull = !isFree && (amt >= std || enr.fee_status === 'PAID_TO_RP' || enr.fee_status === 'OFFICE_CONFIRMED' || enr.fee_status === 'PAID_ON_SPOT');
-                        const isPartial = !isFree && !isFull && amt > 0;
+                <>
+                  {selectedStudentEnrollmentIds.length > 0 && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.6rem 1rem',
+                      background: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      borderRadius: '8px',
+                      marginBottom: '0.85rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.85rem', color: '#991b1b', fontWeight: 700 }}>
+                          {selectedStudentEnrollmentIds.length} student{selectedStudentEnrollmentIds.length > 1 ? 's' : ''} selected
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#b91c1c' }}>
+                          (Batch Delete Mode)
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+                          onClick={() => setSelectedStudentEnrollmentIds([])}
+                        >
+                          Deselect All
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          style={{
+                            background: '#dc2626',
+                            borderColor: '#dc2626',
+                            color: '#fff',
+                            fontSize: '0.75rem',
+                            padding: '0.25rem 0.75rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            fontWeight: 700
+                          }}
+                          onClick={() => {
+                            if (window.confirm(`Are you sure you want to delete all ${selectedStudentEnrollmentIds.length} selected student enrollments from ${currentModalCourse?.title}?\n\nThis will permanently remove their enrollment, fee records, and admission details in one single batch.`)) {
+                              deleteStudentEnrollmentsBatch(selectedStudentEnrollmentIds);
+                              setSelectedStudentEnrollmentIds([]);
+                            }
+                          }}
+                        >
+                          <Trash2 size={13} />
+                          <span>Delete Selected ({selectedStudentEnrollmentIds.length})</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
-                        return (
-                          <tr key={enr.id || idx}>
-                            <td>{idx + 1}</td>
-                            <td>
-                              <strong style={{ fontFamily: 'monospace', color: 'var(--cpet-primary)' }}>
-                                {enr.admission_number}
-                              </strong>
-                            </td>
-                            <td>
-                              <strong style={{ color: 'var(--cpet-text)' }}>{enr.student_name}</strong>
-                            </td>
-                            <td>
-                              <a href={`tel:${enr.account_phone}`} style={{ color: '#0284c7', textDecoration: 'none' }}>
-                                +91 {enr.account_phone}
-                              </a>
-                            </td>
-                            <td>
-                              <span className="badge badge-neutral" style={{ fontSize: '0.72rem' }}>
-                                {enr.centre_name || enr.batch_name || 'General Cohort'}
-                              </span>
-                            </td>
-                            <td>
-                              <span>
-                                {enr.classes_attended || 0} / {currentModalCourse?.total_planned_classes || 0}
-                                {currentModalCourse?.total_planned_classes > 0 && (
-                                  <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: '4px' }}>
-                                    ({Math.round(((enr.classes_attended || 0) / currentModalCourse.total_planned_classes) * 100)}%)
+                  <div className="table-responsive">
+                    <table className="cpet-table" style={{ fontSize: '0.82rem' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ width: '38px', textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              aria-label="Select all students"
+                              checked={modalFilteredStudents.length > 0 && modalFilteredStudents.every(e => selectedStudentEnrollmentIds.includes(e.id))}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedStudentEnrollmentIds(modalFilteredStudents.map(s => s.id));
+                                } else {
+                                  setSelectedStudentEnrollmentIds([]);
+                                }
+                              }}
+                              style={{ cursor: 'pointer', width: '15px', height: '15px' }}
+                              title="Select / Deselect all filtered students"
+                            />
+                          </th>
+                          <th>#</th>
+                          <th>Admission No</th>
+                          <th>Student Name</th>
+                          <th>Contact</th>
+                          <th>{currentModalCourse?.category === 'MAHALLU' ? 'Study Centre' : 'Batch / Cohort'}</th>
+                          <th>Attendance</th>
+                          <th>Fee Status</th>
+                          <th>Enrolled On</th>
+                          <th style={{ textAlign: 'right' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {modalFilteredStudents.map((enr, idx) => {
+                          const std = Number(currentModalCourse?.standard_fee) || 0;
+                          const amt = Number(enr.amount_paid) || 0;
+                          const isFree = enr.fee_status === 'FREE' || std === 0;
+                          const isFull = !isFree && (amt >= std || enr.fee_status === 'PAID_TO_RP' || enr.fee_status === 'OFFICE_CONFIRMED' || enr.fee_status === 'PAID_ON_SPOT');
+                          const isPartial = !isFree && !isFull && amt > 0;
+
+                          return (
+                            <tr key={enr.id || idx} style={selectedStudentEnrollmentIds.includes(enr.id) ? { background: '#fff5f5' } : {}}>
+                              <td style={{ textAlign: 'center' }}>
+                                <input
+                                  type="checkbox"
+                                  aria-label={`Select ${enr.student_name}`}
+                                  checked={selectedStudentEnrollmentIds.includes(enr.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedStudentEnrollmentIds(prev => [...prev, enr.id]);
+                                    } else {
+                                      setSelectedStudentEnrollmentIds(prev => prev.filter(id => id !== enr.id));
+                                    }
+                                  }}
+                                  style={{ cursor: 'pointer', width: '15px', height: '15px' }}
+                                />
+                              </td>
+                              <td>{idx + 1}</td>
+                              <td>
+                                <strong style={{ fontFamily: 'monospace', color: 'var(--cpet-primary)' }}>
+                                  {enr.admission_number}
+                                </strong>
+                              </td>
+                              <td>
+                                <strong style={{ color: 'var(--cpet-text)' }}>{enr.student_name}</strong>
+                              </td>
+                              <td>
+                                <a href={`tel:${enr.account_phone}`} style={{ color: '#0284c7', textDecoration: 'none' }}>
+                                  +91 {enr.account_phone}
+                                </a>
+                              </td>
+                              <td>
+                                <span className="badge badge-neutral" style={{ fontSize: '0.72rem' }}>
+                                  {enr.centre_name || enr.batch_name || 'General Cohort'}
+                                </span>
+                              </td>
+                              <td>
+                                <span>
+                                  {enr.classes_attended || 0} / {currentModalCourse?.total_planned_classes || 0}
+                                  {currentModalCourse?.total_planned_classes > 0 && (
+                                    <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: '4px' }}>
+                                      ({Math.round(((enr.classes_attended || 0) / currentModalCourse.total_planned_classes) * 100)}%)
+                                    </span>
+                                  )}
+                                </span>
+                              </td>
+                              <td>
+                                {isFree ? (
+                                  <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>Free</span>
+                                ) : isFull ? (
+                                  <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>Paid (₹{amt || std})</span>
+                                ) : isPartial ? (
+                                  <span className="badge badge-warning" style={{ fontSize: '0.72rem', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
+                                    Partial: ₹{amt} (Due: ₹{Math.max(0, std - amt)})
+                                  </span>
+                                ) : (
+                                  <span className="badge badge-danger" style={{ fontSize: '0.72rem', background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' }}>
+                                    Due: ₹{std}
                                   </span>
                                 )}
-                              </span>
-                            </td>
-                            <td>
-                              {isFree ? (
-                                <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>Free</span>
-                              ) : isFull ? (
-                                <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>Paid (₹{amt || std})</span>
-                              ) : isPartial ? (
-                                <span className="badge badge-warning" style={{ fontSize: '0.72rem', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
-                                  Partial: ₹{amt} (Due: ₹{Math.max(0, std - amt)})
-                                </span>
-                              ) : (
-                                <span className="badge badge-danger" style={{ fontSize: '0.72rem', background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' }}>
-                                  Due: ₹{std}
-                                </span>
-                              )}
-                            </td>
-                            <td style={{ color: '#64748b', fontSize: '0.75rem' }}>
-                              {enr.enrollment_date || 'N/A'}
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <button
-                                type="button"
-                                className="btn btn-secondary btn-sm"
-                                style={{ color: '#dc2626', borderColor: '#fca5a5', background: '#fff5f5', padding: '0.2rem 0.5rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                title="Delete enrolled student and erase fee/admission records"
-                                onClick={() => {
-                                  if (window.confirm(`Delete "${enr.student_name}" (${enr.admission_number}) from ${currentModalCourse?.title}? This will permanently remove their enrollment, fee record, and admission details.`)) {
-                                    deleteStudentEnrollment(enr.id);
-                                  }
-                                }}
-                              >
-                                <Trash2 size={12} />
-                                <span>Delete</span>
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                              </td>
+                              <td style={{ color: '#64748b', fontSize: '0.75rem' }}>
+                                {enr.enrollment_date || 'N/A'}
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  style={{ color: '#dc2626', borderColor: '#fca5a5', background: '#fff5f5', padding: '0.2rem 0.5rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  title="Delete enrolled student and erase fee/admission records"
+                                  onClick={() => {
+                                    if (window.confirm(`Delete "${enr.student_name}" (${enr.admission_number}) from ${currentModalCourse?.title}? This will permanently remove their enrollment, fee record, and admission details.`)) {
+                                      deleteStudentEnrollment(enr.id);
+                                      setSelectedStudentEnrollmentIds(prev => prev.filter(id => id !== enr.id));
+                                    }
+                                  }}
+                                >
+                                  <Trash2 size={12} />
+                                  <span>Delete</span>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
 
@@ -1386,7 +1478,7 @@ export const CoursesManager = () => {
               <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
                 Showing {modalFilteredStudents.length} of {courseEnrollments.length} total enrolled students
               </span>
-              <button className="btn btn-secondary btn-sm" onClick={() => setSelectedCourseForStudentsModal(null)}>
+              <button className="btn btn-secondary btn-sm" onClick={() => { setSelectedCourseForStudentsModal(null); setSelectedStudentEnrollmentIds([]); }}>
                 Close Roster
               </button>
             </div>

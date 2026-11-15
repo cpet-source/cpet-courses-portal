@@ -81,6 +81,9 @@ export const AppProvider = ({ children }) => {
   const [isCloudConnected, setIsCloudConnected] = useState(false);
   const [cloudError, setCloudError] = useState(null);
   const lastCloudUpdatedAtRef = useRef(0);
+  // Anti-resurrection tombstones: tracks recently deleted items to eliminate network sync race conditions
+  const recentlyDeletedIdsRef = useRef(new Set());
+  const recentlyDeletedPhonesRef = useRef(new Set());
 
   // Offline Sync State
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
@@ -237,6 +240,20 @@ export const AppProvider = ({ children }) => {
   // Helper to delete an entity from MongoDB
   const deleteFromCloud = async (entityName, id, extra = {}) => {
     try {
+      if (id) {
+        if (Array.isArray(id)) {
+          id.forEach(i => recentlyDeletedIdsRef.current.add(String(i)));
+        } else {
+          recentlyDeletedIdsRef.current.add(String(id));
+        }
+      }
+      if (extra?.ids && Array.isArray(extra.ids)) {
+        extra.ids.forEach(i => recentlyDeletedIdsRef.current.add(String(i)));
+      }
+      if (extra?.account_phone) {
+        recentlyDeletedPhonesRef.current.add(String(extra.account_phone));
+      }
+
       const res = await fetch('/api/data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -341,11 +358,15 @@ export const AppProvider = ({ children }) => {
     }
 
     const d = res.data;
+    const deletedIds = recentlyDeletedIdsRef.current;
+    const deletedPhones = recentlyDeletedPhonesRef.current;
+
     // Cloud is the single source of truth - direct assignment (empty cloud = empty state)
-    setCourses(d.courses || []);
-    setCentres(d.centres || []);
-    setResourcePersons(d.resourcePersons || []);
-    setStudents(d.students || []);
+    // Filter against recently deleted items to eliminate any network race condition resurrection
+    setCourses((d.courses || []).filter(c => !deletedIds.has(String(c.id))));
+    setCentres((d.centres || []).filter(c => !deletedIds.has(String(c.id))));
+    setResourcePersons((d.resourcePersons || []).filter(r => !deletedIds.has(String(r.id))));
+    setStudents((d.students || []).filter(s => !deletedPhones.has(String(s.account_phone))));
 
     // Merge offline pending check-in queue to prevent overwriting local check-ins
     const queue = getStored(STORAGE_KEYS.OFFLINE_QUEUE, []);
@@ -356,7 +377,9 @@ export const AppProvider = ({ children }) => {
       }
     });
 
-    const mergedEnrollments = (d.enrollments || []).map(cloudEnr => {
+    const cloudEnrollments = (d.enrollments || []).filter(e => !deletedIds.has(String(e.id)));
+
+    const mergedEnrollments = cloudEnrollments.map(cloudEnr => {
       if (queuedEnrollmentMap.has(cloudEnr.id)) {
         return queuedEnrollmentMap.get(cloudEnr.id);
       }
@@ -366,16 +389,30 @@ export const AppProvider = ({ children }) => {
     // Also include any offline-created spot enrollments
     queue.forEach(qItem => {
       if (qItem.type === 'SPOT_ENROLL' && qItem.payload?.id) {
-        if (!mergedEnrollments.some(e => e.id === qItem.payload.id)) {
+        if (!deletedIds.has(String(qItem.payload.id)) && !mergedEnrollments.some(e => e.id === qItem.payload.id)) {
           mergedEnrollments.push(qItem.payload);
         }
       }
     });
 
     setEnrollments(mergedEnrollments);
-    setClassLogs(d.classLogs || []);
-    setRemittances(d.remittances || []);
-    setPayouts(d.payouts || []);
+    setClassLogs((d.classLogs || []).filter(l => !deletedIds.has(String(l.id))));
+    setRemittances((d.remittances || []).filter(r => !deletedIds.has(String(r.id))));
+    setPayouts((d.payouts || []).filter(p => !deletedIds.has(String(p.id))));
+
+    // Prune tombstone set if cloud no longer contains the items (meaning MongoDB confirmed deletion)
+    const rawEnrollmentIds = new Set((d.enrollments || []).map(e => String(e.id)));
+    deletedIds.forEach(id => {
+      if (!rawEnrollmentIds.has(id)) {
+        deletedIds.delete(id);
+      }
+    });
+    const rawPhones = new Set((d.students || []).map(s => String(s.account_phone)));
+    deletedPhones.forEach(phone => {
+      if (!rawPhones.has(phone)) {
+        deletedPhones.delete(phone);
+      }
+    });
     if (res.last_updated_at) {
       lastCloudUpdatedAtRef.current = Number(res.last_updated_at);
     }
@@ -432,8 +469,15 @@ export const AppProvider = ({ children }) => {
 
     handleInitialSync();
 
-    // Auto-refresh when user clicks into this browser tab
-    const onFocus = () => fetchLatestFromCloud();
+    // Auto-refresh when user clicks into this browser tab (throttled to avoid rapid firing on dialog closes)
+    let lastFocusFetchTime = 0;
+    const onFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusFetchTime > 6000) {
+        lastFocusFetchTime = now;
+        fetchLatestFromCloud();
+      }
+    };
     window.addEventListener('focus', onFocus);
 
     // Online / Offline network listeners
@@ -1340,6 +1384,9 @@ export const AppProvider = ({ children }) => {
     const target = enrollments.find(e => e.id === enrollmentId);
     if (!target) return;
 
+    // Track in anti-resurrection set immediately
+    recentlyDeletedIdsRef.current.add(String(enrollmentId));
+
     // 1. Remove enrollment from state & cloud
     const remainingForPhone = enrollments.filter(e => e.id !== enrollmentId && e.account_phone === target.account_phone);
     setEnrollments(prev => prev.filter(e => e.id !== enrollmentId));
@@ -1361,6 +1408,7 @@ export const AppProvider = ({ children }) => {
         );
 
         if (newMembers.length === 0) {
+          recentlyDeletedPhonesRef.current.add(String(target.account_phone));
           deleteFromCloud('StudentAccount', null, { account_phone: target.account_phone });
           return prev.filter(a => a.account_phone !== target.account_phone);
         } else {
@@ -1372,6 +1420,21 @@ export const AppProvider = ({ children }) => {
     }
 
     showToast(`Enrollment record for "${target.student_name}" (${target.course_title}) deleted.`);
+  };
+
+  // Delete multiple student enrollments in one batch
+  const deleteStudentEnrollmentsBatch = (enrollmentIds) => {
+    if (!Array.isArray(enrollmentIds) || enrollmentIds.length === 0) return;
+    const idSet = new Set(enrollmentIds.map(String));
+    idSet.forEach(id => recentlyDeletedIdsRef.current.add(id));
+
+    // 1. Remove from local state
+    setEnrollments(prev => prev.filter(e => !idSet.has(String(e.id))));
+
+    // 2. Cascade delete in MongoDB batch
+    deleteFromCloud('Enrollment', null, { ids: Array.from(idSet) });
+
+    showToast(`Deleted ${enrollmentIds.length} student enrollment record(s).`);
   };
 
   // Permanently delete student and erase all their enrollments, fees, and profile records
@@ -1391,6 +1454,7 @@ export const AppProvider = ({ children }) => {
     });
 
     const deleteIds = enrollmentsToDelete.map(e => e.id);
+    deleteIds.forEach(id => recentlyDeletedIdsRef.current.add(String(id)));
     setEnrollments(prev => prev.filter(e => !deleteIds.includes(e.id)));
 
     // 2. Remove member profile or entire student account
@@ -1410,6 +1474,7 @@ export const AppProvider = ({ children }) => {
       }
 
       if (newMembers.length === 0) {
+        recentlyDeletedPhonesRef.current.add(String(cleanPhone));
         deleteFromCloud('StudentAccount', null, { account_phone: cleanPhone });
         return prev.filter(a => a.account_phone !== cleanPhone);
       } else {
@@ -1893,6 +1958,7 @@ export const AppProvider = ({ children }) => {
         updateStudentFee,
         updateStudentProfile,
         deleteStudentEnrollment,
+        deleteStudentEnrollmentsBatch,
         deleteStudentCompletely,
         markStudentAttendance,
         checkInStudentAtGate,
