@@ -350,12 +350,12 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
             Select a Mahallu course to view active study centres, manage enrolled students, and track fee collection.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-outline" onClick={() => setShowAttachCentreModal(true)}>
+        <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+          <button className="btn btn-outline" onClick={() => setShowAttachCentreModal(true)} style={{ flex: 1, justifyContent: 'center', fontSize: 'clamp(0.72rem, 2.5vw, 0.9rem)', padding: 'clamp(0.4rem, 2vw, 0.65rem) clamp(0.5rem, 2vw, 1rem)' }}>
             <Plus size={15} />
             Launch Course at Centre
           </button>
-          <button className="btn btn-primary" onClick={openAddStudentModal}>
+          <button className="btn btn-primary" onClick={openAddStudentModal} style={{ flex: 1, justifyContent: 'center', fontSize: 'clamp(0.72rem, 2.5vw, 0.9rem)', padding: 'clamp(0.4rem, 2vw, 0.65rem) clamp(0.5rem, 2vw, 1rem)' }}>
             <UserPlus size={15} />
             Onboard Student
           </button>

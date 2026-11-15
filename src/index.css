@@ -730,35 +730,127 @@ a {
 
 /* Responsive Hide/Show Helpers */
 .hide-on-mobile {
-  display: table-cell;
+  display: inline;
 }
 .show-on-mobile {
   display: none;
 }
+.hide-on-mobile-block {
+  display: block;
+}
+
+/* ═══════════════════════════════════════════════════
+   Mobile Bottom Navigation Bar (RP Portal)
+   Shown only on screens ≤ 768px, hidden on desktop
+═══════════════════════════════════════════════════ */
+.rp-bottom-nav {
+  display: none; /* hidden on desktop by default */
+}
 
 @media (max-width: 768px) {
+  .rp-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 60;
+    background: var(--cpet-surface);
+    border-top: 1.5px solid var(--cpet-border);
+    box-shadow: 0 -4px 16px rgba(50, 53, 126, 0.10);
+    height: 62px;
+    align-items: stretch;
+  }
+
+  .rp-bottom-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 6px 2px 4px;
+    color: #94a3b8;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    transition: color 0.15s ease, background 0.15s ease;
+    position: relative;
+  }
+
+  .rp-bottom-nav-btn:active {
+    background: rgba(50, 53, 126, 0.06);
+  }
+
+  .rp-bottom-nav-btn.active {
+    color: var(--cpet-primary);
+  }
+
+  .rp-bottom-nav-btn.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 2.5px;
+    background: var(--cpet-primary);
+    border-radius: 0 0 4px 4px;
+  }
+
+  .rp-bottom-nav-label {
+    font-size: 0.58rem;
+    font-weight: 600;
+    line-height: 1;
+    text-align: center;
+  }
+
+  /* Desktop tabs hidden on mobile (bottom nav replaces them) */
+  .rp-desktop-tabs {
+    display: none !important;
+  }
+
+  /* Extra bottom padding so content clears the fixed nav bar */
+  .cpet-main {
+    padding: 0.75rem 0.75rem 78px;
+  }
+
+  /* Slim header on mobile */
+  .cpet-logo-badge {
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 1rem !important;
+  }
+
+  .cpet-brand-text p {
+    display: none; /* hide subtitle tagline on mobile */
+  }
+
+  .cpet-brand-text h1 {
+    font-size: 1rem !important;
+  }
+
+  .cpet-navbar {
+    padding: 0.5rem 1rem !important;
+  }
+
   .hide-on-mobile {
     display: none !important;
   }
   .show-on-mobile {
-    display: block !important;
+    display: inline !important;
   }
-  .cpet-navbar {
-    flex-wrap: wrap;
+  .hide-on-mobile-block {
+    display: none !important;
   }
   .role-switcher {
-    width: 100%;
-    justify-content: space-between;
-    overflow-x: auto;
+    gap: 2px;
   }
   .role-btn {
-    flex: 1;
-    justify-content: center;
-    padding: 0.5rem 0.5rem;
+    padding: 0.4rem 0.65rem;
     font-size: 0.75rem;
-  }
-  .cpet-main {
-    padding: 1rem 0.75rem 4rem;
   }
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -773,6 +865,19 @@ a {
   .stat-icon {
     width: 36px;
     height: 36px;
+  }
+}
+
+/* Desktop: keep horizontal top tabs visible, hide bottom nav */
+@media (min-width: 769px) {
+  .rp-bottom-nav {
+    display: none !important;
+  }
+  .rp-desktop-tabs {
+    display: flex !important;
+  }
+  .cpet-main {
+    padding: 1.5rem 1.25rem 3rem;
   }
 }
 
