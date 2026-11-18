@@ -496,20 +496,6 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
             </div>
           ) : null}
         </div>
-
-        {/* Quick action buttons — only for Mahallu courses */}
-        {selectedCourse?.category === 'MAHALLU' && (
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid var(--cpet-border)', flexWrap: 'wrap' }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => setShowAttachCentreModal(true)}>
-              <Plus size={13} /> Launch at Existing Centre
-            </button>
-            {onNavigateToNewCentre && (
-              <button className="btn btn-outline btn-sm" onClick={onNavigateToNewCentre}>
-                <Building size={13} /> Register New Centre
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* STEP 3: Student Roster & Evaluation */}
