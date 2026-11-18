@@ -541,9 +541,10 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
                 {selectedCourse.category === 'MAHALLU' && selectedCentre ? (
                   <>
                     Centre: <strong>{selectedCentre.centre_name}</strong> ({selectedCentre.place}, {selectedCentre.district})
-                    {selectedCentre.committee_president_phone && ` | Pres: ${selectedCentre.committee_president_phone}`}
-                    {selectedCentre.committee_secretary_phone && ` | Sec: ${selectedCentre.committee_secretary_phone}`}
-                    {selectedCentre.course_coordinator_phone && ` | Coord: ${selectedCentre.course_coordinator_name ? selectedCentre.course_coordinator_name + ' (' + selectedCentre.course_coordinator_phone + ')' : selectedCentre.course_coordinator_phone}`}
+                    {selectedCentre.committee_president_phone && ` | Resp 1: ${selectedCentre.committee_president_phone}`}
+                    {selectedCentre.committee_secretary_phone && ` | Resp 2: ${selectedCentre.committee_secretary_phone}`}
+                    {selectedCentre.course_coordinator_phone && ` | Class Coord: ${selectedCentre.course_coordinator_name ? selectedCentre.course_coordinator_name + ' (' + selectedCentre.course_coordinator_phone + ')' : selectedCentre.course_coordinator_phone}`}
+                    {selectedCentre.class_leader_phone && ` | Class Leader: ${selectedCentre.class_leader_name ? selectedCentre.class_leader_name + ' (' + selectedCentre.class_leader_phone + ')' : selectedCentre.class_leader_phone}`}
                   </>
                 ) : (
                   <>

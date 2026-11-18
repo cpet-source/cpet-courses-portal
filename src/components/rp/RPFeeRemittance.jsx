@@ -55,7 +55,6 @@ export const RPFeeRemittance = () => {
     centre_id: initialCentresForCourse[0]?.id || rpCentres[0]?.id || '',
     amount: '',
     payment_mode: 'BANK_TRANSFER',
-    transaction_ref: '',
     notes: ''
   });
 
@@ -84,19 +83,18 @@ export const RPFeeRemittance = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.amount || !formData.transaction_ref) {
-      showToast('Please provide amount and transaction reference UTR', 'danger');
+    if (!formData.amount) {
+      showToast('Please enter the remittance amount', 'danger');
       return;
     }
 
     addRemittance(formData);
     setShowModal(false);
     setFormData({
-      course_id: courses[0]?.id || '',
+      course_id: initialCourseId,
       centre_id: initialCentresForCourse[0]?.id || rpCentres[0]?.id || '',
       amount: '',
       payment_mode: 'BANK_TRANSFER',
-      transaction_ref: '',
       notes: ''
     });
   };
@@ -121,7 +119,7 @@ export const RPFeeRemittance = () => {
             Fee Remittance & Financial Ledger
           </h3>
           <p className="cpet-card-desc">
-            Submit course fees collected from students to the central office account with your bank UTR or receipt.
+            Submit course fees collected from students to the central office account.
           </p>
         </div>
         <button className="btn btn-primary" onClick={() => handleOpenRemitModal(unremittedInHand > 0 ? unremittedInHand : null)}>
@@ -130,63 +128,81 @@ export const RPFeeRemittance = () => {
         </button>
       </div>
 
-      {/* Live Financial Reconciliation KPIs */}
-      <div className="stats-grid" style={{ marginBottom: '1.25rem' }}>
-        <div className="stat-card">
-          <div className="stat-info">
-            <p>Fees Collected from Students</p>
-            <h3 style={{ color: '#16a34a' }}>₹{totalStudentFeesCredited.toLocaleString('en-IN')}</h3>
-            <span>Marked as paid across {rpEnrollments.filter(e => (Number(e.amount_paid) || 0) > 0).length} students</span>
+      {/* Compact 2x2 Financial Summary Card */}
+      <div
+        className="cpet-card"
+        style={{
+          padding: 0,
+          marginBottom: '1rem',
+          overflow: 'hidden'
+        }}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            background: 'var(--cpet-border)',
+            gap: '1px'
+          }}
+        >
+          {/* 1. Fees Collected */}
+          <div style={{ background: 'white', padding: '0.75rem 0.9rem' }}>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: '#64748b' }}>
+              Collected
+            </div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#16a34a', lineHeight: 1.25, margin: '2px 0' }}>
+              ₹{totalStudentFeesCredited.toLocaleString('en-IN')}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+              {rpEnrollments.filter(e => (Number(e.amount_paid) || 0) > 0).length} paid students
+            </div>
           </div>
-          <div className="stat-icon" style={{ background: '#dcfce7', color: '#16a34a' }}>
-            <TrendingUp size={22} />
-          </div>
-        </div>
 
-        <div className="stat-card">
-          <div className="stat-info">
-            <p>Remitted to CPET Office</p>
-            <h3 style={{ color: 'var(--cpet-primary)' }}>₹{totalRemittedToOffice.toLocaleString('en-IN')}</h3>
-            <span>Confirmed: ₹{confirmedRemittedToOffice.toLocaleString('en-IN')}</span>
+          {/* 2. Remitted to Office */}
+          <div style={{ background: 'white', padding: '0.75rem 0.9rem' }}>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: '#64748b' }}>
+              Remitted to Office
+            </div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--cpet-primary)', lineHeight: 1.25, margin: '2px 0' }}>
+              ₹{totalRemittedToOffice.toLocaleString('en-IN')}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+              Confirmed: ₹{confirmedRemittedToOffice.toLocaleString('en-IN')}
+            </div>
           </div>
-          <div className="stat-icon" style={{ background: 'var(--cpet-accent-soft)', color: 'var(--cpet-accent)' }}>
-            <CheckCircle size={22} />
-          </div>
-        </div>
 
-        <div className="stat-card">
-          <div className="stat-info">
-            <p>Unremitted Cash in Hand</p>
-            <h3 style={{ color: unremittedInHand > 0 ? '#b45309' : '#16a34a' }}>
+          {/* 3. Unremitted Cash in Hand */}
+          <div style={{ background: 'white', padding: '0.75rem 0.9rem' }}>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: '#64748b' }}>
+              Cash in Hand
+            </div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: unremittedInHand > 0 ? '#b45309' : '#16a34a', lineHeight: 1.25, margin: '2px 0' }}>
               ₹{unremittedInHand.toLocaleString('en-IN')}
-            </h3>
-            <span>
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
               {unremittedInHand > 0 ? (
                 <button
                   type="button"
-                  style={{ background: 'none', border: 'none', color: '#b45309', fontWeight: 700, padding: 0, cursor: 'pointer', textDecoration: 'underline', fontSize: '0.72rem' }}
+                  style={{ background: 'none', border: 'none', color: '#b45309', fontWeight: 700, padding: 0, cursor: 'pointer', textDecoration: 'underline', fontSize: '0.7rem' }}
                   onClick={() => handleOpenRemitModal(unremittedInHand)}
                 >
-                  Click to Remit to Office →
+                  Remit now →
                 </button>
-              ) : 'All collections remitted ✓'}
-            </span>
+              ) : 'All remitted ✓'}
+            </div>
           </div>
-          <div className="stat-icon" style={{ background: unremittedInHand > 0 ? '#fef3c7' : '#f8fafc', color: unremittedInHand > 0 ? '#b45309' : '#64748b' }}>
-            <Wallet size={22} />
-          </div>
-        </div>
 
-        <div className="stat-card">
-          <div className="stat-info">
-            <p>Student Dues Outstanding</p>
-            <h3 style={{ color: totalStudentDues > 0 ? '#dc2626' : '#16a34a' }}>
+          {/* 4. Student Dues */}
+          <div style={{ background: 'white', padding: '0.75rem 0.9rem' }}>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: '#64748b' }}>
+              Student Dues
+            </div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: totalStudentDues > 0 ? '#dc2626' : '#16a34a', lineHeight: 1.25, margin: '2px 0' }}>
               ₹{totalStudentDues.toLocaleString('en-IN')}
-            </h3>
-            <span>Uncollected student fees</span>
-          </div>
-          <div className="stat-icon" style={{ background: totalStudentDues > 0 ? '#fee2e2' : '#f8fafc', color: totalStudentDues > 0 ? '#dc2626' : '#16a34a' }}>
-            <AlertCircle size={22} />
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+              Uncollected fees
+            </div>
           </div>
         </div>
       </div>
@@ -217,8 +233,10 @@ export const RPFeeRemittance = () => {
               </div>
 
               <div style={{ margin: '0.4rem 0', fontSize: '0.82rem', color: '#475569' }}>
-                <span>Channel: <strong>{rem.payment_mode.replace(/_/g, ' ')}</strong></span> | 
-                <span style={{ marginLeft: '4px' }}>Ref: <strong style={{ fontFamily: 'monospace' }}>{rem.transaction_ref}</strong></span>
+                <span>Channel: <strong>{rem.payment_mode.replace(/_/g, ' ')}</strong></span>
+                {rem.transaction_ref && (
+                  <span> | Ref: <strong style={{ fontFamily: 'monospace' }}>{rem.transaction_ref}</strong></span>
+                )}
               </div>
 
               {rem.notes && (
@@ -318,18 +336,6 @@ export const RPFeeRemittance = () => {
                     <option value="UPI">UPI Transfer / QR Code</option>
                     <option value="CASH_AT_OFFICE">Handed Cash at CPET Office</option>
                   </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Bank Transaction UTR / Ref No <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    required
-                    placeholder="e.g. SBIN0049281928"
-                    value={formData.transaction_ref}
-                    onChange={e => setFormData({ ...formData, transaction_ref: e.target.value })}
-                  />
                 </div>
 
                 <div className="form-group">

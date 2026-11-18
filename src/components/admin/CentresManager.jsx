@@ -24,6 +24,8 @@ export const CentresManager = () => {
     committee_secretary_phone: '',
     course_coordinator_name: '',
     course_coordinator_phone: '',
+    class_leader_name: '',
+    class_leader_phone: '',
     assigned_rp_id: resourcePersons[0]?.id || '',
     active_course_id: courses.find(c => c.category === 'MAHALLU')?.id || courses[0]?.id || ''
   });
@@ -41,6 +43,8 @@ export const CentresManager = () => {
     committee_secretary_phone: '',
     course_coordinator_name: '',
     course_coordinator_phone: '',
+    class_leader_name: '',
+    class_leader_phone: '',
     assigned_rp_id: '',
     active_course_id: ''
   });
@@ -75,6 +79,8 @@ export const CentresManager = () => {
       committee_secretary_phone: '',
       course_coordinator_name: '',
       course_coordinator_phone: '',
+      class_leader_name: '',
+      class_leader_phone: '',
       assigned_rp_id: resourcePersons[0]?.id || '',
       active_course_id: courses.find(c => c.category === 'MAHALLU')?.id || courses[0]?.id || ''
     });
@@ -119,12 +125,14 @@ export const CentresManager = () => {
       'Pincode',
       'Status',
       'Assigned Resource Person',
-      'Course Coordinator Name',
-      'Course Coordinator Phone',
-      'President Name',
-      'President Phone',
-      'Secretary Name',
-      'Secretary Phone',
+      'Class Coordinator Name',
+      'Class Coordinator Phone',
+      'Class Leader Name',
+      'Class Leader Phone',
+      'Responsible Person 1 Name',
+      'Responsible Person 1 Phone',
+      'Responsible Person 2 Name',
+      'Responsible Person 2 Phone',
       'Enrolled Students Count',
       'Running Courses'
     ];
@@ -148,6 +156,8 @@ export const CentresManager = () => {
         `"${(assignedRp ? assignedRp.full_name : 'Unassigned').replace(/"/g, '""')}"`,
         `"${(c.course_coordinator_name || '').replace(/"/g, '""')}"`,
         `"${c.course_coordinator_phone || ''}"`,
+        `"${(c.class_leader_name || '').replace(/"/g, '""')}"`,
+        `"${c.class_leader_phone || ''}"`,
         `"${(c.committee_president_name || '').replace(/"/g, '""')}"`,
         `"${c.committee_president_phone || ''}"`,
         `"${(c.committee_secretary_name || '').replace(/"/g, '""')}"`,
@@ -291,21 +301,27 @@ export const CentresManager = () => {
                 {/* Committee & Coordinator Contacts */}
                 <div style={{ fontSize: '0.82rem', marginBottom: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <span style={{ color: '#64748b' }}>President:</span>
+                    <span style={{ color: '#64748b' }}>Responsible Person 1:</span>
                     <span style={{ fontWeight: 600 }}>
                       {centre.committee_president_name ? `${centre.committee_president_name} (${centre.committee_president_phone || '—'})` : (centre.committee_president_phone || '—')}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <span style={{ color: '#64748b' }}>Secretary:</span>
+                    <span style={{ color: '#64748b' }}>Responsible Person 2:</span>
                     <span style={{ fontWeight: 600 }}>
                       {centre.committee_secretary_name ? `${centre.committee_secretary_name} (${centre.committee_secretary_phone || '—'})` : (centre.committee_secretary_phone || '—')}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b' }}>Coordinator:</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <span style={{ color: '#64748b' }}>Class Coordinator:</span>
                     <span style={{ fontWeight: 600, color: 'var(--cpet-primary)' }}>
                       {centre.course_coordinator_name ? `${centre.course_coordinator_name} (${centre.course_coordinator_phone || '—'})` : (centre.course_coordinator_phone || '—')}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#64748b' }}>Class Leader:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--cpet-primary)' }}>
+                      {centre.class_leader_name ? `${centre.class_leader_name} (${centre.class_leader_phone || '—'})` : (centre.class_leader_phone || '—')}
                     </span>
                   </div>
                 </div>
@@ -348,6 +364,8 @@ export const CentresManager = () => {
                         committee_secretary_phone: centre.committee_secretary_phone || '',
                         course_coordinator_name: centre.course_coordinator_name || '',
                         course_coordinator_phone: centre.course_coordinator_phone || '',
+                        class_leader_name: centre.class_leader_name || '',
+                        class_leader_phone: centre.class_leader_phone || '',
                         assigned_rp_id: centre.assigned_rp_id || '',
                         active_course_id: centre.active_course_id || (centre.course_ids?.[0] || '')
                       });
@@ -464,7 +482,7 @@ export const CentresManager = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group">
-                    <label className="form-label">President Name</label>
+                    <label className="form-label">Responsible Person 1 Name</label>
                     <input
                       type="text"
                       className="form-input"
@@ -474,7 +492,7 @@ export const CentresManager = () => {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">President Phone</label>
+                    <label className="form-label">Responsible Person 1 Phone</label>
                     <input
                       type="tel"
                       className="form-input"
@@ -487,7 +505,7 @@ export const CentresManager = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Secretary Name</label>
+                    <label className="form-label">Responsible Person 2 Name</label>
                     <input
                       type="text"
                       className="form-input"
@@ -497,7 +515,7 @@ export const CentresManager = () => {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Secretary Phone</label>
+                    <label className="form-label">Responsible Person 2 Phone</label>
                     <input
                       type="tel"
                       className="form-input"
@@ -509,16 +527,16 @@ export const CentresManager = () => {
                 </div>
 
                 <hr style={{ border: 'none', borderTop: '1px solid var(--cpet-border)', margin: '1rem 0' }} />
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.25rem' }}>
                   <h4 style={{ fontSize: '0.9rem', color: 'var(--cpet-primary)', margin: 0, fontWeight: 700 }}>
-                    Course Coordinator (Among Students)
+                    Class Coordinator & Class Leader
                   </h4>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Assists with student communications & attendance</span>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Coordinator Name</label>
+                    <label className="form-label">Class Coordinator Name</label>
                     <input
                       type="text"
                       className="form-input"
@@ -528,13 +546,36 @@ export const CentresManager = () => {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Coordinator Mobile No</label>
+                    <label className="form-label">Class Coordinator Mobile No</label>
                     <input
                       type="tel"
                       className="form-input"
                       placeholder="e.g. 9846001122"
                       value={formData.course_coordinator_phone}
                       onChange={e => setFormData({ ...formData, course_coordinator_phone: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Class Leader Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. Aysha Beevi"
+                      value={formData.class_leader_name}
+                      onChange={e => setFormData({ ...formData, class_leader_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Class Leader Mobile No</label>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      placeholder="e.g. 9846334455"
+                      value={formData.class_leader_phone}
+                      onChange={e => setFormData({ ...formData, class_leader_phone: e.target.value })}
                     />
                   </div>
                 </div>
@@ -658,7 +699,7 @@ export const CentresManager = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group">
-                    <label className="form-label">President Name</label>
+                    <label className="form-label">Responsible Person 1 Name</label>
                     <input
                       type="text"
                       className="form-input"
@@ -667,7 +708,7 @@ export const CentresManager = () => {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">President Phone</label>
+                    <label className="form-label">Responsible Person 1 Phone</label>
                     <input
                       type="tel"
                       className="form-input"
@@ -679,7 +720,7 @@ export const CentresManager = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Secretary Name</label>
+                    <label className="form-label">Responsible Person 2 Name</label>
                     <input
                       type="text"
                       className="form-input"
@@ -688,7 +729,7 @@ export const CentresManager = () => {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Secretary Phone</label>
+                    <label className="form-label">Responsible Person 2 Phone</label>
                     <input
                       type="tel"
                       className="form-input"
@@ -699,16 +740,16 @@ export const CentresManager = () => {
                 </div>
 
                 <hr style={{ border: 'none', borderTop: '1px solid var(--cpet-border)', margin: '1rem 0' }} />
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.25rem' }}>
                   <h4 style={{ fontSize: '0.9rem', color: 'var(--cpet-primary)', margin: 0, fontWeight: 700 }}>
-                    Course Coordinator (Among Students)
+                    Class Coordinator & Class Leader
                   </h4>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Assists with student communications & attendance</span>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Coordinator Name</label>
+                    <label className="form-label">Class Coordinator Name</label>
                     <input
                       type="text"
                       className="form-input"
@@ -717,12 +758,33 @@ export const CentresManager = () => {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Coordinator Mobile No</label>
+                    <label className="form-label">Class Coordinator Mobile No</label>
                     <input
                       type="tel"
                       className="form-input"
                       value={editFormData.course_coordinator_phone}
                       onChange={e => setEditFormData({ ...editFormData, course_coordinator_phone: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Class Leader Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editFormData.class_leader_name}
+                      onChange={e => setEditFormData({ ...editFormData, class_leader_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Class Leader Mobile No</label>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      value={editFormData.class_leader_phone}
+                      onChange={e => setEditFormData({ ...editFormData, class_leader_phone: e.target.value })}
                     />
                   </div>
                 </div>

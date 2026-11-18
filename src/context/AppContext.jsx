@@ -1609,7 +1609,7 @@ export const AppProvider = ({ children }) => {
       course_title: resolvedCourseTitle,
       amount: Number(remData.amount),
       payment_mode: remData.payment_mode || 'BANK_TRANSFER',
-      transaction_ref: remData.transaction_ref,
+      transaction_ref: remData.transaction_ref || '',
       remittance_date: remData.remittance_date || new Date().toISOString().split('T')[0],
       status: 'PENDING_VERIFICATION',
       student_count: Number(remData.student_count || 0),

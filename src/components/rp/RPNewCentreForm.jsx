@@ -27,7 +27,9 @@ export const RPNewCentreForm = ({ onCentreCreated }) => {
     committee_secretary_name: '',
     committee_secretary_phone: '',
     course_coordinator_name: '',
-    course_coordinator_phone: ''
+    course_coordinator_phone: '',
+    class_leader_name: '',
+    class_leader_phone: ''
   });
 
   const districts = KERALA_DISTRICTS;
@@ -62,7 +64,9 @@ export const RPNewCentreForm = ({ onCentreCreated }) => {
       committee_secretary_name: '',
       committee_secretary_phone: '',
       course_coordinator_name: '',
-      course_coordinator_phone: ''
+      course_coordinator_phone: '',
+      class_leader_name: '',
+      class_leader_phone: ''
     });
 
     if (onCentreCreated) onCentreCreated();
@@ -185,22 +189,22 @@ export const RPNewCentreForm = ({ onCentreCreated }) => {
 
         <hr style={{ border: 'none', borderTop: '1px solid var(--cpet-border)', margin: '1rem 0' }} />
         <h4 style={{ fontSize: '0.9rem', color: 'var(--cpet-primary)', marginBottom: '0.75rem', fontWeight: 700 }}>
-          Mahallu Committee Office Bearers
+          Mahallu Committee Office Bearers <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b' }}>(Optional)</span>
         </h4>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
           <div className="form-group">
-            <label className="form-label">President Name</label>
+            <label className="form-label">Responsible Person 1 Name</label>
             <input
               type="text"
               className="form-input"
-              placeholder="Usman Haji"
+              placeholder="e.g. Usman Haji"
               value={formData.committee_president_name}
               onChange={e => setFormData({ ...formData, committee_president_name: e.target.value })}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">President Mobile No</label>
+            <label className="form-label">Responsible Person 1 Mobile</label>
             <input
               type="tel"
               className="form-input"
@@ -213,17 +217,17 @@ export const RPNewCentreForm = ({ onCentreCreated }) => {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
           <div className="form-group">
-            <label className="form-label">Secretary Name</label>
+            <label className="form-label">Responsible Person 2 Name</label>
             <input
               type="text"
               className="form-input"
-              placeholder="Abdul Kareem"
+              placeholder="e.g. Abdul Kareem"
               value={formData.committee_secretary_name}
               onChange={e => setFormData({ ...formData, committee_secretary_name: e.target.value })}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Secretary Mobile No</label>
+            <label className="form-label">Responsible Person 2 Mobile</label>
             <input
               type="tel"
               className="form-input"
@@ -235,16 +239,16 @@ export const RPNewCentreForm = ({ onCentreCreated }) => {
         </div>
 
         <hr style={{ border: 'none', borderTop: '1px solid var(--cpet-border)', margin: '1rem 0' }} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.25rem' }}>
           <h4 style={{ fontSize: '0.9rem', color: 'var(--cpet-primary)', margin: 0, fontWeight: 700 }}>
-            Course Coordinator (Among Students)
+            Class Coordinator & Class Leader <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b' }}>(Optional)</span>
           </h4>
           <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Assists with student communications & attendance</span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
           <div className="form-group">
-            <label className="form-label">Coordinator Name</label>
+            <label className="form-label">Class Coordinator Name</label>
             <input
               type="text"
               className="form-input"
@@ -254,13 +258,36 @@ export const RPNewCentreForm = ({ onCentreCreated }) => {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Coordinator Mobile No</label>
+            <label className="form-label">Class Coordinator Mobile</label>
             <input
               type="tel"
               className="form-input"
               placeholder="e.g. 9846001122"
               value={formData.course_coordinator_phone}
               onChange={e => setFormData({ ...formData, course_coordinator_phone: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+          <div className="form-group">
+            <label className="form-label">Class Leader Name</label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="e.g. Aysha Beevi"
+              value={formData.class_leader_name}
+              onChange={e => setFormData({ ...formData, class_leader_name: e.target.value })}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Class Leader Mobile</label>
+            <input
+              type="tel"
+              className="form-input"
+              placeholder="e.g. 9846334455"
+              value={formData.class_leader_phone}
+              onChange={e => setFormData({ ...formData, class_leader_phone: e.target.value })}
             />
           </div>
         </div>

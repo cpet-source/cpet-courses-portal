@@ -117,31 +117,14 @@ export const Navbar = () => {
           {/* If Logged In as Resource Person */}
           {currentUser && currentUser.role === 'rp' && activeRole !== 'volunteer_desk' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div className="role-switcher">
-                <button
-                  className={`role-btn ${activeRole === 'rp' ? 'active rp' : ''}`}
-                  onClick={() => setActiveRole('rp')}
-                >
-                  <GraduationCap size={15} />
-                  <span>{currentRp?.full_name?.split(' ')[0] || 'Teacher'} Portal</span>
-                </button>
-                <button
-                  className={`role-btn ${activeRole === 'student' ? 'active' : ''}`}
-                  onClick={() => setActiveRole('student')}
-                >
-                  <Users size={15} />
-                  <span>Public View</span>
-                </button>
-              </div>
-
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={logout}
                 title="Sign out of Teacher Portal"
-                style={{ color: '#b91c1c' }}
+                style={{ color: '#b91c1c', whiteSpace: 'nowrap' }}
               >
                 <LogOut size={14} />
-                <span className="hide-on-mobile">Logout</span>
+                <span>Logout</span>
               </button>
             </div>
           )}

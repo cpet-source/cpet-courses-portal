@@ -31,38 +31,33 @@ export const RPAcademicEvaluation = () => {
   // View Mode: 'ACTIVE' (Default) vs 'ARCHIVED' (Past / Completed Batches)
   const [viewMode, setViewMode] = useState('ACTIVE');
 
-  // Helper: Verify centre was founded by or assigned to the current RP
+  // Helper: Verify centre was founded by or assigned to the current RP (used to sort own centres first)
   const isCentreOwnedByRP = (c) => {
     if (!currentRp?.id) return false;
     return c.founded_by_rp_id === currentRp.id || c.assigned_rp_id === currentRp.id;
   };
 
-  const rpOwnedCentres = centres.filter(isCentreOwnedByRP);
-
   // Helper: Check if course is accessible to current RP
+  // Mahallu courses & centres are open to all RPs here so visiting teachers can mark attendance/marks.
+  // Non-Mahallu courses remain strictly restricted to Admin-assigned RPs.
   const isCourseAssignedToRP = (c) => {
     if (!currentRp?.id) return false;
     if (c.category === 'MAHALLU') {
-      return rpOwnedCentres.some(ctr => 
-        ctr.active_course_id === c.id || 
-        (Array.isArray(ctr.course_ids) && ctr.course_ids.includes(c.id)) ||
-        enrollments.some(e => e.course_id === c.id && e.centre_id === ctr.id)
-      );
+      return true;
     } else {
-      // Non-Mahallu courses: ONLY accessible if Admin assigned this RP to the course or to a batch
       const isCourseDirect = c.assigned_rp_id === currentRp.id;
       const isBatchAssigned = Array.isArray(c.batches) && c.batches.some(b => b.assigned_rp_id === currentRp.id);
       return isCourseDirect || isBatchAssigned;
     }
   };
 
-  // 1. Course Selection (filtered by active vs concluded and assigned to this RP)
+  // 1. Course Selection (filtered by active vs concluded)
   const baseCourses = courses.filter(c => {
     if (!isCourseAssignedToRP(c)) return false;
     if (viewMode === 'ACTIVE') {
       return c.status !== 'COMPLETED';
     } else {
-      return c.status === 'COMPLETED' || rpOwnedCentres.some(ctr => ctr.completed_course_ids?.includes(c.id));
+      return c.status === 'COMPLETED' || centres.some(ctr => ctr.completed_course_ids?.includes(c.id));
     }
   });
 
@@ -78,20 +73,27 @@ export const RPAcademicEvaluation = () => {
 
   const selectedCourse = courses.find(c => c.id === selectedCourseId) || availableCourses[0];
 
-  // 2. Study Centres running selected course (scoped strictly to current RP's centres)
-  const courseCentres = rpOwnedCentres.filter(c => {
-    if (!selectedCourseId) return false;
-    const isDirect = c.active_course_id === selectedCourseId;
-    const inList = Array.isArray(c.course_ids) && c.course_ids.includes(selectedCourseId);
-    const hasEnrollment = enrollments.some(e => e.course_id === selectedCourseId && e.centre_id === c.id);
-    const isAttached = isDirect || inList || hasEnrollment;
-    if (!isAttached) return false;
+  // 2. Study Centres running selected course (all centres available for visiting RPs; own centres sorted first)
+  const courseCentres = centres
+    .filter(c => {
+      if (!selectedCourseId) return false;
+      const isDirect = c.active_course_id === selectedCourseId;
+      const inList = Array.isArray(c.course_ids) && c.course_ids.includes(selectedCourseId);
+      const hasEnrollment = enrollments.some(e => e.course_id === selectedCourseId && e.centre_id === c.id);
+      const isAttached = isDirect || inList || hasEnrollment;
+      if (!isAttached) return false;
 
-    const isBatchCompleted = selectedCourse?.status === 'COMPLETED' || 
-                             (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(selectedCourseId));
+      const isBatchCompleted = selectedCourse?.status === 'COMPLETED' || 
+                               (Array.isArray(c.completed_course_ids) && c.completed_course_ids.includes(selectedCourseId));
 
-    return viewMode === 'ACTIVE' ? !isBatchCompleted : isBatchCompleted;
-  });
+      return viewMode === 'ACTIVE' ? !isBatchCompleted : isBatchCompleted;
+    })
+    .sort((a, b) => {
+      const aOwn = isCentreOwnedByRP(a) ? 0 : 1;
+      const bOwn = isCentreOwnedByRP(b) ? 0 : 1;
+      if (aOwn !== bOwn) return aOwn - bOwn;
+      return (a.centre_name || '').localeCompare(b.centre_name || '');
+    });
 
   const [selectedCentreId, setSelectedCentreId] = useState(courseCentres[0]?.id || '');
 
@@ -252,11 +254,11 @@ export const RPAcademicEvaluation = () => {
                 style={{ fontWeight: 700 }}
               >
                 {courseCentres.length === 0 ? (
-                  <option value="">-- No study centres registered under your account --</option>
+                  <option value="">-- No study centres running this course --</option>
                 ) : (
                   courseCentres.map(c => (
                     <option key={c.id} value={c.id}>
-                      🏛️ {c.centre_name} ({c.place}, {c.district})
+                      {isCentreOwnedByRP(c) ? '⭐' : '🏛️'} {c.centre_name} ({c.place}, {c.district})
                     </option>
                   ))
                 )}
@@ -307,18 +309,20 @@ export const RPAcademicEvaluation = () => {
         </div>
 
         {/* Evaluation Sub-Mode Switcher */}
-        <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #edf2f7', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ marginTop: '1.15rem', paddingTop: '1rem', borderTop: '1px solid #edf2f7', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', width: '100%', maxWidth: '420px' }}>
             <button
               className={`btn ${activeMode === 'MARKS' ? 'btn-primary' : 'btn-outline'}`}
               onClick={() => setActiveMode('MARKS')}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 1rem' }}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.15rem', padding: '0.5rem 0.5rem', fontSize: '0.82rem', minHeight: '48px', textAlign: 'center', lineHeight: 1.2 }}
             >
-              <Award size={16} />
-              <span>Subject Mark Entry</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700 }}>
+                <Award size={15} />
+                Mark Entry
+              </span>
               {hasSubjects && (
-                <span className="badge badge-accent" style={{ fontSize: '0.7rem', padding: '1px 5px' }}>
-                  {subjects.length} Subjects
+                <span style={{ fontSize: '0.68rem', opacity: 0.85, fontWeight: 600 }}>
+                  {subjects.length} {subjects.length === 1 ? 'Subject' : 'Subjects'}
                 </span>
               )}
             </button>
@@ -326,12 +330,14 @@ export const RPAcademicEvaluation = () => {
             <button
               className={`btn ${activeMode === 'ATTENDANCE' ? 'btn-primary' : 'btn-outline'}`}
               onClick={() => setActiveMode('ATTENDANCE')}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 1rem' }}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.15rem', padding: '0.5rem 0.5rem', fontSize: '0.82rem', minHeight: '48px', textAlign: 'center', lineHeight: 1.2 }}
             >
-              <CalendarCheck size={16} />
-              <span>Attendance Register</span>
-              <span className="badge badge-primary" style={{ fontSize: '0.7rem', padding: '1px 5px' }}>
-                {totalClasses} Classes
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700 }}>
+                <CalendarCheck size={15} />
+                Attendance
+              </span>
+              <span style={{ fontSize: '0.68rem', opacity: 0.85, fontWeight: 600 }}>
+                {totalClasses} {totalClasses === 1 ? 'Class' : 'Classes'}
               </span>
             </button>
           </div>
