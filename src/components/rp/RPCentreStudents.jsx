@@ -515,67 +515,38 @@ export const RPCentreStudents = ({ onNavigateToNewCentre, onNavigateToEvaluation
       {/* STEP 3: Student Roster & Evaluation */}
       {selectedCourse && (selectedCourse.category === 'MAHALLU' ? selectedCentre : true) && (
         <div>
-          {/* Active Batch Summary Banner */}
+          {/* Compact Overall Counts Strip */}
           <div
             style={{
-              background: 'white',
+              background: 'var(--cpet-border)',
               border: '1px solid var(--cpet-border)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '1rem',
-              marginBottom: '1rem',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '1rem'
+              borderRadius: 'var(--radius-md)',
+              overflow: 'hidden',
+              marginBottom: '0.85rem',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))',
+              gap: '1px'
             }}
           >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
-                <span className="badge badge-primary">{selectedCourse.course_code}</span>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--cpet-primary)', margin: 0 }}>
-                  {selectedCourse.title}
-                </h3>
-              </div>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
-                {selectedCourse.category === 'MAHALLU' && selectedCentre ? (
-                  <>
-                    Centre: <strong>{selectedCentre.centre_name}</strong> ({selectedCentre.place}, {selectedCentre.district})
-                    {selectedCentre.committee_president_phone && ` | Resp 1: ${selectedCentre.committee_president_phone}`}
-                    {selectedCentre.committee_secretary_phone && ` | Resp 2: ${selectedCentre.committee_secretary_phone}`}
-                    {selectedCentre.course_coordinator_phone && ` | Class Coord: ${selectedCentre.course_coordinator_name ? selectedCentre.course_coordinator_name + ' (' + selectedCentre.course_coordinator_phone + ')' : selectedCentre.course_coordinator_phone}`}
-                    {selectedCentre.class_leader_phone && ` | Class Leader: ${selectedCentre.class_leader_name ? selectedCentre.class_leader_name + ' (' + selectedCentre.class_leader_phone + ')' : selectedCentre.class_leader_phone}`}
-                  </>
-                ) : (
-                  <>
-                    Intake Cohort: <strong>{selectedBatchId === 'ALL' ? 'All Batches' : (selectedCourse?.batches?.find(b => b.id === selectedBatchId)?.batch_name || 'Batch 1')}</strong>
-                  </>
-                )}
-              </p>
+            <div style={{ background: 'white', padding: '0.55rem 0.4rem', textAlign: 'center' }}>
+              <span style={{ fontSize: '0.66rem', fontWeight: 700, textTransform: 'uppercase', color: '#64748b', display: 'block' }}>Students</span>
+              <strong style={{ fontSize: '0.98rem', color: 'var(--cpet-primary)' }}>{batchStudents.length}</strong>
             </div>
-
-            {/* Batch Metrics */}
-            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-              <div style={{ background: '#f8fafc', padding: '0.4rem 0.75rem', borderRadius: '6px', border: '1px solid var(--cpet-border)', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>Students</span>
-                <strong style={{ fontSize: '1rem', color: 'var(--cpet-primary)' }}>{batchStudents.length}</strong>
+            <div style={{ background: '#f0fdf4', padding: '0.55rem 0.4rem', textAlign: 'center' }}>
+              <span style={{ fontSize: '0.66rem', fontWeight: 700, textTransform: 'uppercase', color: '#166534', display: 'block' }}>Collected</span>
+              <strong style={{ fontSize: '0.98rem', color: '#16a34a' }}>₹{totalBatchCollected.toLocaleString('en-IN')}</strong>
+            </div>
+            {!isFreeCourse && (
+              <div style={{ background: totalBatchDues > 0 ? '#fef2f2' : 'white', padding: '0.55rem 0.4rem', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.66rem', fontWeight: 700, textTransform: 'uppercase', color: totalBatchDues > 0 ? '#991b1b' : '#64748b', display: 'block' }}>Dues</span>
+                <strong style={{ fontSize: '0.98rem', color: totalBatchDues > 0 ? '#dc2626' : '#16a34a' }}>
+                  {totalBatchDues > 0 ? `₹${totalBatchDues.toLocaleString('en-IN')}` : 'Clear ✓'}
+                </strong>
               </div>
-              <div style={{ background: '#f0fdf4', padding: '0.4rem 0.75rem', borderRadius: '6px', border: '1px solid #bbf7d0', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.7rem', color: '#166534', display: 'block' }}>Fees Credited (RP)</span>
-                <strong style={{ fontSize: '1rem', color: '#16a34a' }}>₹{totalBatchCollected.toLocaleString('en-IN')}</strong>
-              </div>
-              {!isFreeCourse && (
-                <div style={{ background: totalBatchDues > 0 ? '#fef2f2' : '#f8fafc', padding: '0.4rem 0.75rem', borderRadius: '6px', border: totalBatchDues > 0 ? '1px solid #fecaca' : '1px solid var(--cpet-border)', textAlign: 'center' }}>
-                  <span style={{ fontSize: '0.7rem', color: totalBatchDues > 0 ? '#991b1b' : '#64748b', display: 'block' }}>Dues Outstanding</span>
-                  <strong style={{ fontSize: '1rem', color: totalBatchDues > 0 ? '#dc2626' : '#16a34a' }}>
-                    {totalBatchDues > 0 ? `₹${totalBatchDues.toLocaleString('en-IN')}` : 'All Clear ✓'}
-                  </strong>
-                </div>
-              )}
-              <div style={{ background: '#f8fafc', padding: '0.4rem 0.75rem', borderRadius: '6px', border: '1px solid var(--cpet-border)', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>Syllabus</span>
-                <strong style={{ fontSize: '1rem', color: '#334155' }}>{selectedCourse.total_planned_classes || 0} Classes</strong>
-              </div>
+            )}
+            <div style={{ background: 'white', padding: '0.55rem 0.4rem', textAlign: 'center' }}>
+              <span style={{ fontSize: '0.66rem', fontWeight: 700, textTransform: 'uppercase', color: '#64748b', display: 'block' }}>Classes</span>
+              <strong style={{ fontSize: '0.98rem', color: '#334155' }}>{selectedCourse.total_planned_classes || 0}</strong>
             </div>
           </div>
 
